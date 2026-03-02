@@ -1,5 +1,6 @@
 import User from "../models/user.model.js";
 import { generateToken } from "../utils/jwt.js";
+import { sendEmail } from "../utils/sendEmail.js";
 
 const generateRandomPassword = (length = 8) => {
   const chars =
@@ -34,7 +35,21 @@ export const registerUser = async (userData) => {
       email: userData.email,
       flag: Number(userData.flag),
       password: generatedPassword,
+      status: 1 ,
     });
+
+    await sendEmail(
+      userData.email,
+      "Your Account Credentials",
+      `
+        <h2>Welcome ${userData.name}</h2>
+        <p>Your account has been created successfully.</p>
+        <p><strong>Email:</strong> ${userData.email}</p>
+        <p><strong>Password:</strong> ${generatedPassword}</p>
+        <p>Please login and change your password.</p>
+      `
+    );
+  
 
     // Return user without password, plus the generated password separately
     const userObject = user.toObject();
@@ -56,12 +71,19 @@ export const registerUser = async (userData) => {
  * @returns {object} User object and JWT token
  */
 export const loginUser = async (email, password) => {
-  // Find user and include password field
+  // Find user and include password
   const user = await User.findOne({ email }).select("+password");
 
   if (!user) {
     const error = new Error("Invalid email or password");
     error.statusCode = 401;
+    throw error;
+  }
+
+  //  CHECK STATUS FIRST
+  if (user.status !== 1) {
+    const error = new Error("Your account is inactive. Please contact admin.");
+    error.statusCode = 403;
     throw error;
   }
 
@@ -77,9 +99,10 @@ export const loginUser = async (email, password) => {
   // Generate token
   const token = generateToken(user._id.toString());
 
-  // Return user without password and token
+  // Remove password
   const userObject = user.toObject();
   delete userObject.password;
+
   return { user: userObject, token };
 };
 
@@ -96,4 +119,23 @@ export const getUserById = async (userId) => {
     throw error;
   }
   return user;
+};
+
+
+/**
+ * Get user by ID
+ * @param {string} userId - User ID
+ * @returns {object} User object
+ */
+
+export const getAllUsersService = async () => {
+  const users = await User.find().select("-password");
+
+  if (!users) {
+    const error = new Error("User not found");
+    error.statusCode = 404;
+    throw error;
+  }
+
+  return users; 
 };

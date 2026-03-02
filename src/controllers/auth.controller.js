@@ -2,6 +2,7 @@ import {
   registerUser,
   loginUser,
   getUserById,
+  getAllUsersService,
 } from "../services/auth.service.js";
 import { asyncHandler } from "../utils/asyncHandler.js";
 
@@ -73,5 +74,20 @@ export const getProfile = asyncHandler(async (req, res) => {
   res.status(200).json({
     success: true,
     data: user,
+  });
+});
+
+/**
+ * Get all users (protected route)
+ * GET /api/auth/getAllUsers
+ */
+
+export const getAllUsers = asyncHandler(async (req, res) => {
+  const users = await getAllUsersService();
+
+  res.status(200).json({
+    success: true,
+    count: users.length,
+    data: users,
   });
 });

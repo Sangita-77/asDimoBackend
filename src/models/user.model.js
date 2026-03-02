@@ -30,6 +30,11 @@ const userSchema = new mongoose.Schema(
       required: true,
       enum: [0, 1, 2, 3, 4, 5], // SuperAdmin - 0 , OrganizationAdmin - 1 , ParentsOrg - 2 , TeachersOrg - 3 , parentsGlobal - 4 , teachersGlobal - 5
     },
+    status: {
+      type: Number,
+      default: 1, // 1 = Active, 0 = Inactive
+      enum: [0, 1],
+    },
   },
   { timestamps: true }
 );
