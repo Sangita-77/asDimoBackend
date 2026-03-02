@@ -1,10 +1,20 @@
 import User from "../models/user.model.js";
 import { generateToken } from "../utils/jwt.js";
 
+const generateRandomPassword = (length = 8) => {
+  const chars =
+    "ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz23456789";
+  let password = "";
+  for (let i = 0; i < length; i++) {
+    password += chars.charAt(Math.floor(Math.random() * chars.length));
+  }
+  return password;
+};
+
 /**
  * Register a new user
- * @param {object} userData - User data (name, email, password)
- * @returns {object} Created user object
+ * @param {object} userData - User data (name, email, flag)
+ * @returns {object} Created user object and generated password
  */
 export const registerUser = async (userData) => {
   // Check if user already exists
@@ -16,17 +26,20 @@ export const registerUser = async (userData) => {
   }
 
   try {
+    const generatedPassword = generateRandomPassword();
+
     // Create user (password will be hashed by pre-save hook)
     const user = await User.create({
       name: userData.name,
       email: userData.email,
-      password: userData.password,
+      flag: Number(userData.flag),
+      password: generatedPassword,
     });
 
-    // Return user without password
+    // Return user without password, plus the generated password separately
     const userObject = user.toObject();
     delete userObject.password;
-    return userObject;
+    return { user: userObject, generatedPassword };
   } catch (error) {
     // Handle Mongoose validation errors
     if (error.name === "ValidationError") {

@@ -10,22 +10,29 @@ import { asyncHandler } from "../utils/asyncHandler.js";
  * POST /api/auth/register
  */
 export const register = asyncHandler(async (req, res) => {
-  const { name, email, password } = req.body;
+  const { name, email, flag } = req.body;
 
   // Validate required fields
-  if (!name || !email || !password) {
+  if (!name || !email || flag === undefined || flag === null) {
     return res.status(400).json({
       success: false,
-      message: "Please provide name, email, and password",
+      message: "Please provide name, email, and flag",
     });
   }
 
-  const user = await registerUser({ name, email, password });
+  const { user, generatedPassword } = await registerUser({
+    name,
+    email,
+    flag,
+  });
 
   res.status(201).json({
     success: true,
     message: "User registered successfully",
-    data: user,
+    data: {
+      user,
+      generatedPassword, // send auto-generated password so it can be shown/sent to the user
+    },
   });
 });
 

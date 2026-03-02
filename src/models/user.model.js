@@ -3,6 +3,11 @@ import bcrypt from "bcryptjs";
 
 const userSchema = new mongoose.Schema(
   {
+    userId: {
+      type: Number,
+      unique: true,
+      index: true, // Fast lookup and ensure uniqueness
+    },
     name: {
       type: String,
       required: true,
@@ -20,9 +25,30 @@ const userSchema = new mongoose.Schema(
       minlength: 6,
       select: false, // Don't include password in queries by default
     },
+    flag: {
+      type: Number,
+      required: true,
+      enum: [0, 1, 2, 3, 4, 5], // SuperAdmin - 0 , OrganizationAdmin - 1 , ParentsOrg - 2 , TeachersOrg - 3 , parentsGlobal - 4 , teachersGlobal - 5
+    },
   },
   { timestamps: true }
 );
+
+// Auto-increment userId for each new user
+userSchema.pre("save", async function () {
+  if (!this.isNew) {
+    return;
+  }
+
+  // Find the user with the highest userId and increment it
+  const lastUser = await this.constructor
+    .findOne({})
+    .sort({ userId: -1 })
+    .select("userId")
+    .lean();
+
+  this.userId = lastUser && lastUser.userId ? lastUser.userId + 1 : 1;
+});
 
 // Hash password before saving
 userSchema.pre("save", async function () {
