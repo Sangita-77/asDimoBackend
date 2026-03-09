@@ -11,7 +11,7 @@ import { asyncHandler } from "../utils/asyncHandler.js";
  * POST /api/auth/register
  */
 export const register = asyncHandler(async (req, res) => {
-  const { name, email, flag } = req.body;
+  const { name, email, flag, organizationId } = req.body;
 
   // Validate required fields
   if (!name || !email || flag === undefined || flag === null) {
@@ -21,10 +21,20 @@ export const register = asyncHandler(async (req, res) => {
     });
   }
 
-  const { user, generatedPassword } = await registerUser({
+  // For ParentsOrg (2) and TeachersOrg (3), organizationId is required
+  const numericFlag = Number(flag);
+  if ((numericFlag === 2 || numericFlag === 3) && !organizationId) {
+    return res.status(400).json({
+      success: false,
+      message: "organizationId is required for flag 2 and 3",
+    });
+  }
+
+  const { user, generatedPassword, role } = await registerUser({
     name,
     email,
     flag,
+    organizationId,
   });
 
   res.status(201).json({
@@ -33,6 +43,7 @@ export const register = asyncHandler(async (req, res) => {
     data: {
       user,
       generatedPassword, // send auto-generated password so it can be shown/sent to the user
+      role,
     },
   });
 });
