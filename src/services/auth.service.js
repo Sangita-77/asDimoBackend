@@ -1,4 +1,9 @@
 import User from "../models/user.model.js";
+import Parent from "../models/parents.model.js";
+import Teacher from "../models/teachers.model.js";
+import SuperAdmin from "../models/superAdmin.model.js";
+import OrganizationAdmin from "../models/organizationAdmin.model.js";
+import mongoose from "mongoose";
 import { generateToken } from "../utils/jwt.js";
 import { sendEmail } from "../utils/sendEmail.js";
 
@@ -18,6 +23,8 @@ const generateRandomPassword = (length = 8) => {
  * @returns {object} Created user object and generated password
  */
 export const registerUser = async (userData) => {
+
+  // return userData;
   // Check if user already exists
   const existingUser = await User.findOne({ email: userData.email });
   if (existingUser) {
@@ -29,32 +36,191 @@ export const registerUser = async (userData) => {
   try {
     const generatedPassword = generateRandomPassword();
 
-    // Create user (password will be hashed by pre-save hook)
-    const user = await User.create({
-      name: userData.name,
-      email: userData.email,
-      flag: Number(userData.flag),
-      password: generatedPassword,
-      status: 1 ,
-    });
+    const flag = Number(userData.flag);
 
-    await sendEmail(
-      userData.email,
-      "Your Account Credentials",
-      `
-        <h2>Welcome ${userData.name}</h2>
-        <p>Your account has been created successfully.</p>
-        <p><strong>Email:</strong> ${userData.email}</p>
-        <p><strong>Password:</strong> ${generatedPassword}</p>
-        <p>Please login and change your password.</p>
-      `
-    );
+    // If flag is 2 or 3, organizationId is required (stored only on Parent/Teacher docs)
+    // Here organizationId is the organization's users.userId (Number)
+    let organizationUserIdForPT = null;
+    if (flag === 2 || flag === 3) {
+      if (!userData.organizationId) {
+        const error = new Error("organizationId is required for flag 2 and 3");
+        error.statusCode = 400;
+        throw error;
+      }
+
+      organizationUserIdForPT = Number(userData.organizationId);
+      if (!Number.isFinite(organizationUserIdForPT) || organizationUserIdForPT <= 0) {
+        const error = new Error("Invalid organizationId");
+        error.statusCode = 400;
+        throw error;
+      }
+    }
+
+    // Use transaction when available; fallback to manual rollback if transactions are not supported
+    const session = await mongoose.startSession();
+    let user;
+    let roleDoc;
+
+    try {
+      await session.withTransaction(async () => {
+        user = await User.create(
+          [
+            {
+              name: userData.name,
+              email: userData.email,
+              flag,
+              password: generatedPassword,
+              status: 1,
+            },
+          ],
+          { session }
+        );
+        user = user[0];
+
+        // Create role-specific "table"
+        if (flag === 0) {
+          roleDoc = await SuperAdmin.create(
+            [
+              {
+                adminId: user.userId,
+                userId: user.userId,
+                user: user._id,
+              },
+            ],
+            { session }
+          );
+          roleDoc = roleDoc[0];
+        } else if (flag === 1) {
+          roleDoc = await OrganizationAdmin.create(
+            [
+              {
+                adminId: user.userId,
+                userId: user.userId,
+                user: user._id,
+                // for OrganizationAdmin, organizationId is this same user's userId
+                organizationId: user.userId,
+              },
+            ],
+            { session }
+          );
+          roleDoc = roleDoc[0];
+        } else if (flag === 2 || flag === 4) {
+          roleDoc = await Parent.create(
+            [
+              {
+                parentId: user.userId,
+                userId: user.userId,
+                user: user._id,
+                organizationId: flag === 2 ? organizationUserIdForPT : null,
+              },
+            ],
+            { session }
+          );
+          roleDoc = roleDoc[0];
+        } else if (flag === 3 || flag === 5) {
+          roleDoc = await Teacher.create(
+            [
+              {
+                teacherId: user.userId,
+                userId: user.userId,
+                user: user._id,
+                organizationId: flag === 3 ? organizationUserIdForPT : null,
+              },
+            ],
+            { session }
+          );
+          roleDoc = roleDoc[0];
+        } else {
+          const error = new Error("Invalid flag value");
+          error.statusCode = 400;
+          throw error;
+        }
+      });
+    } catch (txErr) {
+      // If transactions are not supported (e.g., standalone Mongo), do a best-effort rollback flow
+      if (
+        typeof txErr?.message === "string" &&
+        (txErr.message.includes("Transaction") ||
+          txErr.message.includes("replica set") ||
+          txErr.message.includes("not supported"))
+      ) {
+        // Create user first
+        user = await User.create({
+          name: userData.name,
+          email: userData.email,
+          flag,
+          password: generatedPassword,
+          status: 1,
+        });
+
+        try {
+          if (flag === 0) {
+            roleDoc = await SuperAdmin.create({
+              adminId: user.userId,
+              userId: user.userId,
+              user: user._id,
+            });
+          } else if (flag === 1) {
+            roleDoc = await OrganizationAdmin.create({
+              adminId: user.userId,
+              userId: user.userId,
+              user: user._id,
+              // for OrganizationAdmin, organizationId is this same user's userId
+              organizationId: user.userId,
+            });
+          } else if (flag === 2 || flag === 4) {
+            roleDoc = await Parent.create({
+              parentId: user.userId,
+              userId: user.userId,
+              user: user._id,
+              organizationId: flag === 2 ? organizationUserIdForPT : null,
+            });
+          } else if (flag === 3 || flag === 5) {
+            roleDoc = await Teacher.create({
+              teacherId: user.userId,
+              userId: user.userId,
+              user: user._id,
+              organizationId: flag === 3 ? organizationUserIdForPT : null,
+            });
+          } else {
+            const error = new Error("Invalid flag value");
+            error.statusCode = 400;
+            throw error;
+          }
+        } catch (roleErr) {
+          await User.deleteOne({ _id: user._id });
+          throw roleErr;
+        }
+      } else {
+        throw txErr;
+      }
+    } finally {
+      session.endSession();
+    }
+
+    // await sendEmail(
+    //   userData.email,
+    //   "Your Account Credentials",
+    //   `
+    //     <h2>Welcome ${userData.name}</h2>
+    //     <p>Your account has been created successfully.</p>
+    //     <p><strong>Email:</strong> ${userData.email}</p>
+    //     <p><strong>Password:</strong> ${generatedPassword}</p>
+    //     <p>Please login and change your password.</p>
+    //   `
+    // );
   
 
     // Return user without password, plus the generated password separately
     const userObject = user.toObject();
     delete userObject.password;
-    return { user: userObject, generatedPassword };
+    return {
+      user: userObject,
+      generatedPassword,
+      role: roleDoc
+        ? { collection: roleDoc.constructor?.modelName, _id: roleDoc._id }
+        : null,
+    };
   } catch (error) {
     // Handle Mongoose validation errors
     if (error.name === "ValidationError") {

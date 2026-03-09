@@ -45,11 +45,14 @@ userSchema.pre("save", async function () {
     return;
   }
 
+  const session = this.$session?.() || undefined;
+
   // Find the user with the highest userId and increment it
   const lastUser = await this.constructor
     .findOne({})
     .sort({ userId: -1 })
     .select("userId")
+    .session(session)
     .lean();
 
   this.userId = lastUser && lastUser.userId ? lastUser.userId + 1 : 1;
