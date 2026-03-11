@@ -7,10 +7,10 @@ import { authenticate } from "./middlewares/auth.middleware.js";
 const router = Router();
 
 // Authentication routes
-router.post("/auth/register", register);
-router.post("/auth/login", login);
-router.get("/auth/profile", authenticate, getProfile);
-router.get("/auth/getAllUsers", getAllUsers);
+router.post("/v1/auth/register", register);
+router.post("/v1/auth/login", login);
+router.get("/v1/auth/profile", authenticate, getProfile);
+router.get("/v1/auth/getAllUsers", getAllUsers);
 
 // AssesmentSet routes
 router.post("/v1/addAssesment", authenticate, addAssesment);
