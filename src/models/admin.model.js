@@ -1,6 +1,6 @@
 import mongoose from "mongoose";
 
-const organizationSchema = new mongoose.Schema(
+const adminSchema = new mongoose.Schema(
   {
     name: {
       type: String,
@@ -18,4 +18,4 @@ const organizationSchema = new mongoose.Schema(
   { timestamps: true }
 );
 
-export default mongoose.model("Organization", organizationSchema);
+export default mongoose.model("adminSchema", adminSchema);
