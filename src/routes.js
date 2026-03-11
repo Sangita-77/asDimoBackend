@@ -1,6 +1,7 @@
 import { Router } from "express";
 import { register, login, getProfile,getAllUsers } from "./controllers/auth.controller.js";
-import { addAssesment,getAssesment,assesmentTestCon } from "./controllers/admin.controller.js";
+import { addAssesment,getAssesment } from "./controllers/admin.controller.js";
+import { assesmentTestCon } from "./controllers/parents.controller.js";
 import { authenticate } from "./middlewares/auth.middleware.js";
 
 const router = Router();
@@ -12,9 +13,12 @@ router.get("/auth/profile", authenticate, getProfile);
 router.get("/auth/getAllUsers", getAllUsers);
 
 // AssesmentSet routes
-router.post("/auth/addAssesment", authenticate, addAssesment);
-router.get("/auth/getAssesment", authenticate, getAssesment);
-router.post("/auth/assesmentTest", authenticate, assesmentTestCon);
+router.post("/v1/addAssesment", authenticate, addAssesment);
+router.get("/v1/getAssesment", authenticate, getAssesment);
+
+// parents
+
+router.post("/v1/assesmentTest", authenticate, assesmentTestCon);
 
 
 
