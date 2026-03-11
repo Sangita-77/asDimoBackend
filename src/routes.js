@@ -1,6 +1,6 @@
 import { Router } from "express";
 import { register, login, getProfile,getAllUsers } from "./controllers/auth.controller.js";
-import { addAssesment } from "./controllers/admin.controller.js";
+import { addAssesment,getAssesment,assesmentTestCon } from "./controllers/admin.controller.js";
 import { authenticate } from "./middlewares/auth.middleware.js";
 
 const router = Router();
@@ -13,6 +13,8 @@ router.get("/auth/getAllUsers", getAllUsers);
 
 // AssesmentSet routes
 router.post("/auth/addAssesment", authenticate, addAssesment);
+router.get("/auth/getAssesment", authenticate, getAssesment);
+router.post("/auth/assesmentTest", authenticate, assesmentTestCon);
 
 
 

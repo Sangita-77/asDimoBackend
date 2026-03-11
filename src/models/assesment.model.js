@@ -17,7 +17,7 @@ const assesmentSchema = new mongoose.Schema(
     
       ansOptions: [
         {
-          id: {
+          ansOptionsId: {
             type: Number,
             required: true
           },
