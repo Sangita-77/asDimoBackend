@@ -60,9 +60,9 @@ export const assetmentTestService = async (testData) => {
   
       var message = "";
   
-      if(totalPercentage <= 50 ){
+      if(totalPercentage < 50 ){
         message = "poor bacha";
-      }else if(totalPercentage <= 80){
+      }else if(totalPercentage < 80){
         message = "average bacha";
       }else{
         message = "normal bacha";
