@@ -3,7 +3,9 @@ import {
     getAssesmentSet
   } from "../services/admin.service.js";
   import { asyncHandler } from "../utils/asyncHandler.js";
-  
+import { createRequire } from 'module';
+
+const require = createRequire(import.meta.url);
 
 export const addAssesment = asyncHandler(async (req, res) => {
 
