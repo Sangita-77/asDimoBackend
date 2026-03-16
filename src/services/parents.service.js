@@ -48,6 +48,40 @@ export const assetmentTestService = async (testData) => {
       throw new Error(
         `Option ${ansOptionsId} not found under question ${questionId}`
       );
+<<<<<<< HEAD
+=======
+  
+      if (!option) {
+        throw new Error(
+          `Option ${ansOptionsId} not found under question ${questionId}`
+        );
+      }
+  
+      const totalOptions = question.ansOptions.length;
+  
+      const optionWeight = questionWeight / totalOptions;
+  
+      const percentage = optionWeight * ansOptionsId;
+  
+      totalPercentage +=  percentage;
+  
+      var message = "";
+  
+      if(totalPercentage < 50 ){
+        message = "poor bacha";
+      }else if(totalPercentage < 80){
+        message = "average bacha";
+      }else{
+        message = "normal bacha";
+      }
+  
+      result.push({
+        questionId,
+        ansOptionsId,
+        percentage
+      });
+  
+>>>>>>> b6e3a6907e73f657f844fa198efe944b72461c3e
     }
 
     const totalOptions = question.ansOptions.length;
