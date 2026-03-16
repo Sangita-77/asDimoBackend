@@ -298,12 +298,32 @@ export const loginUser = async (email, password) => {
  */
 export const getUserById = async (userId) => {
   const user = await User.findById(userId).select("-password");
+
   if (!user) {
     const error = new Error("User not found");
     error.statusCode = 404;
     throw error;
   }
-  return user;
+
+  let roleData = null;
+
+  if (user.flag === 0) {
+    roleData = await SuperAdmin.findOne({ userId: user.userId });
+  } 
+  else if (user.flag === 1) {
+    roleData = await OrganizationAdmin.findOne({ userId: user.userId });
+  } 
+  else if (user.flag === 2 || user.flag === 4) {
+    roleData = await Parent.findOne({ userId: user.userId });
+  } 
+  else if (user.flag === 3 || user.flag === 5) {
+    roleData = await Teacher.findOne({ userId: user.userId });
+  }
+
+  return {
+    user,
+    roleData
+  };
 };
 
 
