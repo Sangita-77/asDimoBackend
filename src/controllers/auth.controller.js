@@ -11,9 +11,8 @@ import { asyncHandler } from "../utils/asyncHandler.js";
  * POST /api/auth/register
  */
 export const register = asyncHandler(async (req, res) => {
-  const { name, email, flag, organizationId } = req.body;
+  const { name, email, flag, organizationId, organization_type } = req.body;
 
-  // Validate required fields
   if (!name || !email || flag === undefined || flag === null) {
     return res.status(400).json({
       success: false,
@@ -21,8 +20,24 @@ export const register = asyncHandler(async (req, res) => {
     });
   }
 
-  // For ParentsOrg (2) and TeachersOrg (3), organizationId is required
   const numericFlag = Number(flag);
+
+  // organization_type mandatory for OrganizationAdmin
+  if (numericFlag === 1 && organization_type === undefined) {
+    return res.status(400).json({
+      success: false,
+      message: "organization_type is required for Organization Admin",
+    });
+  }
+
+  // Validate organization_type value
+  if (numericFlag === 1 && ![0, 1].includes(Number(organization_type))) {
+    return res.status(400).json({
+      success: false,
+      message: "organization_type must be 0 (Clinic) or 1 (School)",
+    });
+  }
+
   if ((numericFlag === 2 || numericFlag === 3) && !organizationId) {
     return res.status(400).json({
       success: false,
@@ -35,6 +50,7 @@ export const register = asyncHandler(async (req, res) => {
     email,
     flag,
     organizationId,
+    organization_type
   });
 
   res.status(201).json({
@@ -42,7 +58,7 @@ export const register = asyncHandler(async (req, res) => {
     message: "User registered successfully",
     data: {
       user,
-      generatedPassword, // send auto-generated password so it can be shown/sent to the user
+      generatedPassword,
       role,
     },
   });

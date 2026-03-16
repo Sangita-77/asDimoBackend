@@ -26,6 +26,11 @@ const organizationAdminSchema = new mongoose.Schema(
       type: Number,
       required: true,
     },
+    organization_type: {
+      type: Number,
+      enum: [0, 1], // 0 = Clinic, 1 = School
+      required: true
+    }
 
     // TODO: add more org-admin-specific fields/permissions here.
   },

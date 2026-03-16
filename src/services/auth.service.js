@@ -38,6 +38,24 @@ export const registerUser = async (userData) => {
 
     const flag = Number(userData.flag);
 
+
+    // organization_type required for organization admin
+    if (flag === 1) {
+      if (userData.organization_type === undefined) {
+        const error = new Error("organization_type is required for Organization Admin");
+        error.statusCode = 400;
+        throw error;
+      }
+
+      const orgType = Number(userData.organization_type);
+
+      if (![0, 1].includes(orgType)) {
+        const error = new Error("organization_type must be 0 (Clinic) or 1 (School)");
+        error.statusCode = 400;
+        throw error;
+      }
+    }
+
     // If flag is 2 or 3, organizationId is required (stored only on Parent/Teacher docs)
     // Here organizationId is the organization's users.userId (Number)
     let organizationUserIdForPT = null;
@@ -99,6 +117,7 @@ export const registerUser = async (userData) => {
                 user: user._id,
                 // for OrganizationAdmin, organizationId is this same user's userId
                 organizationId: user.userId,
+                organization_type: Number(userData.organization_type),
               },
             ],
             { session }
