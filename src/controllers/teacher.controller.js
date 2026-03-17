@@ -18,6 +18,6 @@ export const addAvailabilityCon = asyncHandler(async (req, res) => {
   res.status(200).json({
     success: true,
     message: "Availability added successfully",
-    data: user,
+    data: {user},
   });
 });

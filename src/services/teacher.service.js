@@ -1,7 +1,18 @@
 import Availability from "../models/avialability.model.js";
+import User from "../models/user.model.js";
 
 
 export const addAvailabilityservice = async (userId, date, time) => {
+
+    // const user = await User.findById(userId).select("-password");
+    const user = await User.findOne({ userId }).select("flag");
+    const flag = user?.flag;
+
+    if( flag !== 3 && flag !== 5 ){
+        const error = new Error("This user is not Doctor/Therapist/Teacher");
+        error.statusCode = 404;
+        throw error;
+    }
 
     const dateRegex = /^\d{2}-\d{2}-\d{4}$/;
     if (!dateRegex.test(date)) {
@@ -44,4 +55,4 @@ export const addAvailabilityservice = async (userId, date, time) => {
     });
   
     return availability;
-  };
+};
