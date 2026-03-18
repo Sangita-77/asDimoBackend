@@ -2,7 +2,7 @@ import { Router } from "express";
 import { register, login, getProfile,getAllUsers } from "./controllers/auth.controller.js";
 import { addAssesment,getAssesment } from "./controllers/admin.controller.js";
 import { assesmentTestCon } from "./controllers/parents.controller.js";
-import { addAvailabilityCon } from "./controllers/teacher.controller.js";
+import { addAvailabilityCon , getAvailabilityWTCon } from "./controllers/teacher.controller.js";
 import { authenticate } from "./middlewares/auth.middleware.js";
 
 const router = Router();
@@ -24,6 +24,7 @@ router.post("/v1/assesmentTest", authenticate, assesmentTestCon);
 // teachers
 
 router.post("/v1/addAvailability", authenticate, addAvailabilityCon);
+router.post("/v1/getAvailabilityWithUser", authenticate, getAvailabilityWTCon);
 
 
 
