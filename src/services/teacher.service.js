@@ -68,6 +68,26 @@ export const addAvailabilityservice = async (userId, date, time) => {
 // };
 
 
+// export const getAvailabilityWTSer = async () => {
+//   const availability = await Availability.find();
+
+//   const userIds = [...new Set(availability.map(item => item.userId))];
+
+//   const users = await User.find({ userId: { $in: userIds } });
+
+//   const result = availability.map(item => {
+//     const user = users.find(u => u.userId === item.userId);
+
+//     return {
+//       ...item.toObject(),
+//       userDetails: user || null
+//     };
+//   });
+
+//   return result;
+// };
+
+
 export const getAvailabilityWTSer = async () => {
   const data = await Availability.aggregate([
     {
@@ -151,22 +171,3 @@ export const getAvailabilityWTSer = async () => {
   return data;
 };
 
-
-// export const getAvailabilityWTSer = async () => {
-//   const availability = await Availability.find();
-
-//   const userIds = [...new Set(availability.map(item => item.userId))];
-
-//   const users = await User.find({ userId: { $in: userIds } });
-
-//   const result = availability.map(item => {
-//     const user = users.find(u => u.userId === item.userId);
-
-//     return {
-//       ...item.toObject(),
-//       userDetails: user || null
-//     };
-//   });
-
-//   return result;
-// };

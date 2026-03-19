@@ -1,6 +1,7 @@
 import {
   addAvailabilityservice,
   getAvailabilityWTSer,
+  getTeachersWASer
   } from "../services/teacher.service.js";
   import { asyncHandler } from "../utils/asyncHandler.js";
 
@@ -31,10 +32,5 @@ export const getAvailabilityWTCon = asyncHandler(async (req,res) => {
     message: "Availability added successfully",
     data: {availability},
   });
-
-});
-
-export const getTeachersWA = asyncHandler(async (req , res) => {
-
 
 });
