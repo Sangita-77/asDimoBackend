@@ -3,13 +3,11 @@ import {
   loginUser,
   getUserById,
   getAllUsersService,
+  logoutUser,
 } from "../services/auth.service.js";
 import { asyncHandler } from "../utils/asyncHandler.js";
 
-/**
- * Register a new user
- * POST /api/auth/register
- */
+
 export const register = asyncHandler(async (req, res) => {
   const { name, email, flag, organizationId, organization_type } = req.body;
 
@@ -64,10 +62,7 @@ export const register = asyncHandler(async (req, res) => {
   });
 });
 
-/**
- * Login user
- * POST /api/auth/login
- */
+
 export const login = asyncHandler(async (req, res) => {
   const { email, password } = req.body;
 
@@ -91,10 +86,6 @@ export const login = asyncHandler(async (req, res) => {
   });
 });
 
-/**
- * Get current user profile (protected route)
- * GET /api/auth/profile
- */
 export const getProfile = asyncHandler(async (req, res) => {
   const user = await getUserById(req.user._id);
 
@@ -104,10 +95,6 @@ export const getProfile = asyncHandler(async (req, res) => {
   });
 });
 
-/**
- * Get all users (protected route)
- * GET /api/auth/getAllUsers
- */
 
 export const getAllUsers = asyncHandler(async (req, res) => {
   const users = await getAllUsersService();
@@ -116,5 +103,17 @@ export const getAllUsers = asyncHandler(async (req, res) => {
     success: true,
     count: users.length,
     data: users,
+  });
+});
+
+
+export const logout = asyncHandler(async (req, res) => {
+  const token = req.token; // coming from middleware
+
+  await logoutUser(token);
+
+  res.status(200).json({
+    success: true,
+    message: "Logged out successfully",
   });
 });

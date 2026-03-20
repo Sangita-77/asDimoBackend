@@ -3,6 +3,7 @@ import Parent from "../models/parents.model.js";
 import Teacher from "../models/teachers.model.js";
 import SuperAdmin from "../models/superAdmin.model.js";
 import OrganizationAdmin from "../models/organizationAdmin.model.js";
+import BlacklistLog from "../models/blacklistLog.model.js";
 import mongoose from "mongoose";
 import { generateToken } from "../utils/jwt.js";
 import { sendEmail } from "../utils/sendEmail.js";
@@ -17,11 +18,7 @@ const generateRandomPassword = (length = 8) => {
   return password;
 };
 
-/**
- * Register a new user
- * @param {object} userData - User data (name, email, flag)
- * @returns {object} Created user object and generated password
- */
+
 export const registerUser = async (userData) => {
 
   // return userData;
@@ -249,12 +246,6 @@ export const registerUser = async (userData) => {
   }
 };
 
-/**
- * Login user and return token
- * @param {string} email - User email
- * @param {string} password - User password
- * @returns {object} User object and JWT token
- */
 export const loginUser = async (email, password) => {
   // Find user and include password
   const user = await User.findOne({ email }).select("+password");
@@ -291,11 +282,6 @@ export const loginUser = async (email, password) => {
   return { user: userObject, token };
 };
 
-/**
- * Get user by ID
- * @param {string} userId - User ID
- * @returns {object} User object
- */
 export const getUserById = async (userId) => {
   const user = await User.findById(userId).select("-password");
 
@@ -326,13 +312,6 @@ export const getUserById = async (userId) => {
   };
 };
 
-
-/**
- * Get user by ID
- * @param {string} userId - User ID
- * @returns {object} User object
- */
-
 export const getAllUsersService = async () => {
   const users = await User.find().select("-password");
 
@@ -343,4 +322,21 @@ export const getAllUsersService = async () => {
   }
 
   return users; 
+};
+
+
+
+export const logoutUser = async (token) => {
+  if (!token) {
+    const error = new Error("Token not provided");
+    error.statusCode = 400;
+    throw error;
+  }
+
+  await BlacklistLog.create({
+    token,
+    expiresAt: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000),
+  });
+
+  return true;
 };
