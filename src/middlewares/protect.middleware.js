@@ -11,7 +11,6 @@ export const protect = asyncHandler(async (req, res, next) => {
     token = req.headers.authorization.split(" ")[1];
     req.token = token;
 
-    // ❌ check BlacklistLog
     const isBlacklistLoged = await BlacklistLog.findOne({ token });
     if (isBlacklistLoged) {
       return res.status(401).json({
@@ -20,7 +19,6 @@ export const protect = asyncHandler(async (req, res, next) => {
       });
     }
 
-    // ✅ verify token
     const decoded = jwt.verify(token, process.env.JWT_SECRET);
 
     req.user = { id: decoded.id };
