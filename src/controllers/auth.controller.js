@@ -4,6 +4,7 @@ import {
   getUserById,
   getAllUsersService,
   logoutUser,
+  updateUserService,
 } from "../services/auth.service.js";
 import { asyncHandler } from "../utils/asyncHandler.js";
 
@@ -115,5 +116,25 @@ export const logout = asyncHandler(async (req, res) => {
   res.status(200).json({
     success: true,
     message: "Logged out successfully",
+  });
+});
+
+
+export const updateUser = asyncHandler(async (req, res) => {
+  const userId = req.params.id;
+  const { name, email, flag, organizationId, organization_type } = req.body;
+
+  const result = await updateUserService(userId, {
+    name,
+    email,
+    flag,
+    organizationId,
+    organization_type,
+  });
+
+  res.status(200).json({
+    success: true,
+    message: "User updated successfully",
+    data: result,
   });
 });

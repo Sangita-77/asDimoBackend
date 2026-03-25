@@ -1,5 +1,5 @@
 import { Router } from "express";
-import { register, login, getProfile,getAllUsers,logout } from "./controllers/auth.controller.js";
+import { register, login, getProfile,getAllUsers,updateUser,logout } from "./controllers/auth.controller.js";
 import { addAssesment,getAssesment } from "./controllers/admin.controller.js";
 import { assesmentTestCon } from "./controllers/parents.controller.js";
 import { addAvailabilityCon , getAvailabilityWTCon } from "./controllers/teacher.controller.js";
@@ -12,7 +12,8 @@ const router = Router();
 router.post("/v1/auth/register", register);
 router.post("/v1/auth/login", login);
 router.get("/v1/auth/profile", authenticate, protect , getProfile);
-router.get("/v1/auth/getAllUsers", getAllUsers);
+router.get("/v1/auth/getAllUsers", authenticate, protect , getAllUsers);
+router.put("/v1/auth/updateUser/:id", authenticate, protect , updateUser);
 
 router.post("/v1/auth/logout", protect, logout);
 
