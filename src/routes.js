@@ -1,8 +1,25 @@
 import { Router } from "express";
-import { register, login, getProfile,getAllUsers,updateUser,logout } from "./controllers/auth.controller.js";
-import { addAssesment,getAssesment } from "./controllers/admin.controller.js";
-import { assesmentTestCon,bookAppoinmentCon } from "./controllers/parents.controller.js";
-import { addAvailabilityCon , getAvailabilityWTCon } from "./controllers/teacher.controller.js";
+import { 
+    register, 
+    login, 
+    getProfile,
+    getAllUsers,
+    updateUser,
+    logout 
+} from "./controllers/auth.controller.js";
+import { 
+    addAssesment,
+    getAssesment 
+} from "./controllers/admin.controller.js";
+import { 
+    assesmentTestCon,
+    bookAppoinmentCon,
+    cancelAppointmentCon,
+ } from "./controllers/parents.controller.js";
+import { 
+    addAvailabilityCon , 
+    getAvailabilityWTCon 
+} from "./controllers/teacher.controller.js";
 import { authenticate } from "./middlewares/auth.middleware.js";
 import { protect } from "./middlewares/protect.middleware.js";
 
@@ -32,6 +49,7 @@ router.post("/v1/getAvailabilityWithUser", authenticate , protect , getAvailabil
 
 router.post("/v1/bookAppoinmentCon", authenticate , protect , bookAppoinmentCon);
 
+router.put("/v1/cancelAppointment/:appointmentId",authenticate,protect,cancelAppointmentCon);
 
 
 

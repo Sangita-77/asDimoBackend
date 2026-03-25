@@ -1,6 +1,7 @@
 import {
     assetmentTestService,
     bookAppoinmentSer,
+    cancelAppointmentSer,
   } from "../services/parents.service.js";
   import { asyncHandler } from "../utils/asyncHandler.js";
   
@@ -44,3 +45,23 @@ export const bookAppoinmentCon = asyncHandler(async (req, res) => {
     data,
   });
 });
+
+export const cancelAppointmentCon = asyncHandler(async (req, res) => {
+  const { appointmentId } = req.params;
+
+  if (!appointmentId) {
+    return res.status(400).json({
+      success: false,
+      message: "Please provide appointmentId",
+    });
+  }
+
+  const data = await cancelAppointmentSer(appointmentId);
+
+  res.status(200).json({
+    success: true,
+    message: "Appointment cancelled successfully",
+    data,
+  });
+});
+

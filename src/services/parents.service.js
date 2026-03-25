@@ -130,3 +130,36 @@ export const bookAppoinmentSer = async (parentId, teacherId, date, time) => {
 
   return appointment;
 };
+
+
+export const cancelAppointmentSer = async (appointmentId) => {
+
+  const appointment = await Appointment.findById(appointmentId);
+
+  if (!appointment) {
+    throw new Error("Appointment not found");
+  }
+
+  if (appointment.status === "cancelled") {
+    throw new Error("Appointment already cancelled");
+  }
+
+  // 1. Update appointment status
+  appointment.status = "cancelled";
+  await appointment.save();
+
+  // 2. Free the slot again
+  await Availability.findOneAndUpdate(
+    {
+      userId: appointment.teacherId,
+      date: appointment.date,
+      time: appointment.time,
+    },
+    {
+      isBooked: false,
+    }
+  );
+
+  return appointment;
+};
+
