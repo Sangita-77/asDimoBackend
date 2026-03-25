@@ -1,4 +1,6 @@
 import Assessment from "../models/assesment.model.js";
+import Availability from "../models/avialability.model.js";
+import Appointment from "../models/appoinment.model.js";
 
 
 export const assetmentTestService = async (testData) => {
@@ -82,4 +84,49 @@ export const assetmentTestService = async (testData) => {
     message
   };
 
+};
+
+export const bookAppoinmentSer = async (parentId, teacherId, date, time) => {
+
+  // 1. Check if availability exists
+  const availability = await Availability.findOne({
+    userId: teacherId,
+    date,
+    time,
+  });
+
+  if (!availability) {
+    throw new Error("This time slot is not available");
+  }
+
+  // 2. Check if already booked
+  if (availability.isBooked) {
+    throw new Error("This slot is already booked");
+  }
+
+  // 3. Prevent duplicate booking by same parent
+  const existingAppointment = await Appointment.findOne({
+    parentId,
+    teacherId,
+    date,
+    time,
+  });
+
+  if (existingAppointment) {
+    throw new Error("You already booked this slot");
+  }
+
+  // 4. Create appointment
+  const appointment = await Appointment.create({
+    parentId,
+    teacherId,
+    date,
+    time,
+  });
+
+  // 5. Mark slot as booked
+  availability.isBooked = true;
+  await availability.save();
+
+  return appointment;
 };

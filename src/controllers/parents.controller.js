@@ -1,5 +1,6 @@
 import {
-    assetmentTestService
+    assetmentTestService,
+    bookAppoinmentSer,
   } from "../services/parents.service.js";
   import { asyncHandler } from "../utils/asyncHandler.js";
   
@@ -23,4 +24,23 @@ export const assesmentTestCon = asyncHandler(async (req , res) => {
     data: testData,
   });
 
+});
+
+export const bookAppoinmentCon = asyncHandler(async (req, res) => {
+  const { parentId, teacherId, date, time } = req.body;
+
+  if (!parentId || !teacherId || !date || !time) {
+    return res.status(400).json({
+      success: false,
+      message: "Please provide parentId, teacherId, date, time",
+    });
+  }
+
+  const data = await bookAppoinmentSer(parentId, teacherId, date, time);
+
+  res.status(200).json({
+    success: true,
+    message: "Appointment booked successfully",
+    data,
+  });
 });

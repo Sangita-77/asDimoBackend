@@ -17,6 +17,10 @@ const availabilitySchema = new mongoose.Schema(
         type: String, // "HH:mm"
         required: true,
       },
+      isBooked: { 
+        type: Boolean, 
+        default: false 
+      }
     },
     { timestamps: true }
 );
