@@ -20,7 +20,10 @@ const availabilitySchema = new mongoose.Schema(
       isBooked: { 
         type: Boolean, 
         default: false 
-      }
+      },
+      zoomLink: String,
+      zoomMeetingId: String,
+      zoomPassword: String,
     },
     { timestamps: true }
 );
