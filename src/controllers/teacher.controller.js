@@ -1,6 +1,7 @@
 import {
   addAvailabilityservice,
   getAvailabilityWTSer,
+  approveAppointmentSer,
   } from "../services/teacher.service.js";
   import { asyncHandler } from "../utils/asyncHandler.js";
 
@@ -32,4 +33,24 @@ export const getAvailabilityWTCon = asyncHandler(async (req,res) => {
     data: {availability},
   });
 
+});
+
+
+export const approveAppointmentCon = asyncHandler(async (req, res) => {
+  const { appointmentId, status } = req.body;
+
+  if (!appointmentId || !status) {
+    return res.status(400).json({
+      success: false,
+      message: "appointmentId and status are required",
+    });
+  }
+
+  const data = await approveAppointmentSer(appointmentId, status);
+
+  res.status(200).json({
+    success: true,
+    message: `Appointment ${status} successfully`,
+    data,
+  });
 });

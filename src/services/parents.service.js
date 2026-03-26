@@ -88,23 +88,32 @@ export const assetmentTestService = async (testData) => {
 
 export const bookAppoinmentSer = async (parentId, teacherId, date, time) => {
 
-  // 1. Check if availability exists
+  // 1. Check availability
   const availability = await Availability.findOne({
     userId: teacherId,
     date,
     time,
   });
 
+  // const availability = await Availability.findById(appointment.availabilityId);
+
   if (!availability) {
     throw new Error("This time slot is not available");
   }
 
-  // 2. Check if already booked
-  if (availability.isBooked) {
+  // 2. Check already approved
+  const alreadyApproved = await Appointment.findOne({
+    teacherId,
+    date,
+    time,
+    status: "approved",
+  });
+
+  if (alreadyApproved) {
     throw new Error("This slot is already booked");
   }
 
-  // 3. Prevent duplicate booking by same parent
+  // 3. Prevent duplicate
   const existingAppointment = await Appointment.findOne({
     parentId,
     teacherId,
@@ -113,23 +122,71 @@ export const bookAppoinmentSer = async (parentId, teacherId, date, time) => {
   });
 
   if (existingAppointment) {
-    throw new Error("You already booked this slot");
+    throw new Error("You already requested this slot");
   }
 
-  // 4. Create appointment
+  // 4. Create appointment with availabilityId ✅
   const appointment = await Appointment.create({
     parentId,
     teacherId,
+    availabilityId: availability._id, // 🔥 IMPORTANT
     date,
     time,
+    status: "pending",
+    zoomLink: availability.zoomLink,
   });
-
-  // 5. Mark slot as booked
-  availability.isBooked = true;
-  await availability.save();
 
   return appointment;
 };
+
+// export const bookAppoinmentSer = async (parentId, teacherId, date, time) => {
+
+//   // 1. Check availability
+//   const availability = await Availability.findOne({
+//     userId: teacherId,
+//     date,
+//     time,
+//   });
+
+//   if (!availability) {
+//     throw new Error("This time slot is not available");
+//   }
+
+//   // ❗ Only block if already APPROVED booking exists
+//   const alreadyApproved = await Appointment.findOne({
+//     teacherId,
+//     date,
+//     time,
+//     status: "approved",
+//   });
+
+//   if (alreadyApproved) {
+//     throw new Error("This slot is already booked");
+//   }
+
+//   // 2. Prevent duplicate booking by same parent
+//   const existingAppointment = await Appointment.findOne({
+//     parentId,
+//     teacherId,
+//     date,
+//     time,
+//   });
+
+//   if (existingAppointment) {
+//     throw new Error("You already requested this slot");
+//   }
+
+//   // 3. Create PENDING appointment
+//   const appointment = await Appointment.create({
+//     parentId,
+//     teacherId,
+//     date,
+//     time,
+//     status: "pending", // ✅ important
+//   });
+
+//   return appointment;
+// };
 
 
 export const cancelAppointmentSer = async (appointmentId) => {

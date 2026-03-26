@@ -1,6 +1,8 @@
 import Availability from "../models/avialability.model.js";
 import User from "../models/user.model.js";
+import Appointment from "../models/appoinment.model.js";
 import { createZoomMeeting } from "../utils/zoom.js";
+import { sendEmail } from "../utils/mailer.js";
 
 
 
@@ -118,3 +120,67 @@ export const getAvailabilityWTSer = async () => {
   return data;
 };
 
+export const approveAppointmentSer = async (appointmentId, status) => {
+
+  const allowedStatus = ["approved", "rejected"];
+
+  if (!allowedStatus.includes(status)) {
+    throw new Error("Invalid status. Use 'approved' or 'rejected'");
+  }
+
+  const appointment = await Appointment.findById(appointmentId);
+
+  if (!appointment) {
+    throw new Error("Appointment not found");
+  }
+
+  if (appointment.status !== "pending") {
+    throw new Error("Only pending appointments can be updated");
+  }
+
+  if (status === "approved") {
+
+    const alreadyApproved = await Appointment.findOne({
+      teacherId: appointment.teacherId,
+      date: appointment.date,
+      time: appointment.time,
+      status: "approved",
+    });
+
+    if (alreadyApproved) {
+      throw new Error("Slot already booked by another user");
+    }
+
+    appointment.status = "approved";
+    await appointment.save();
+
+    const availability = await Availability.findOne({
+      userId: appointment.teacherId,
+      date: appointment.date,
+      time: appointment.time,
+    });
+
+    if (availability) {
+      availability.isBooked = true;
+      await availability.save();
+    }
+
+    await Appointment.updateMany(
+      {
+        teacherId: appointment.teacherId,
+        date: appointment.date,
+        time: appointment.time,
+        status: "pending",
+        _id: { $ne: appointmentId },
+      },
+      { status: "rejected" }
+    );
+  }
+
+  if (status === "rejected") {
+    appointment.status = "rejected";
+    await appointment.save();
+  }
+
+  return appointment;
+};

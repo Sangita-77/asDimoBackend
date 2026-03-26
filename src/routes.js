@@ -18,7 +18,8 @@ import {
  } from "./controllers/parents.controller.js";
 import { 
     addAvailabilityCon , 
-    getAvailabilityWTCon 
+    getAvailabilityWTCon,
+    approveAppointmentCon
 } from "./controllers/teacher.controller.js";
 import { authenticate } from "./middlewares/auth.middleware.js";
 import { protect } from "./middlewares/protect.middleware.js";
@@ -50,6 +51,8 @@ router.post("/v1/getAvailabilityWithUser", authenticate , protect , getAvailabil
 router.post("/v1/bookAppoinmentCon", authenticate , protect , bookAppoinmentCon);
 
 router.put("/v1/cancelAppointment/:appointmentId",authenticate,protect,cancelAppointmentCon);
+
+router.post("/v1/approveAppointment", authenticate , protect , approveAppointmentCon);
 
 
 
