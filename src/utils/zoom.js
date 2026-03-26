@@ -1,6 +1,5 @@
 import axios from "axios";
 
-// ✅ Get Access Token
 const getZoomAccessToken = async () => {
   const response = await axios.post(
     `https://zoom.us/oauth/token?grant_type=account_credentials&account_id=${process.env.ZOOM_ACCOUNT_ID}`,
@@ -19,7 +18,6 @@ const getZoomAccessToken = async () => {
   return response.data.access_token;
 };
 
-// ✅ Create Meeting
 export const createZoomMeeting = async (date, time) => {
   try {
     const token = await getZoomAccessToken();
@@ -28,7 +26,7 @@ export const createZoomMeeting = async (date, time) => {
     const startTime = new Date(`${year}-${month}-${day}T${time}:00`);
 
     const response = await axios.post(
-      `https://api.zoom.us/v2/users/me/meetings`, // ✅ use 'me'
+      `https://api.zoom.us/v2/users/me/meetings`,
       {
         topic: "Appointment Meeting",
         type: 2,
@@ -42,7 +40,7 @@ export const createZoomMeeting = async (date, time) => {
       },
       {
         headers: {
-          Authorization: `Bearer ${token}`, // ✅ correct
+          Authorization: `Bearer ${token}`, 
           "Content-Type": "application/json",
         },
       }
@@ -50,7 +48,7 @@ export const createZoomMeeting = async (date, time) => {
 
     return response.data;
   } catch (error) {
-    console.log("❌ Zoom Error:", error.response?.data || error.message);
+    console.log("Zoom Error:", error.response?.data || error.message);
     throw new Error("Zoom meeting creation failed");
   }
 };
