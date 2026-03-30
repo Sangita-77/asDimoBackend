@@ -28,7 +28,7 @@ const userSchema = new mongoose.Schema(
     flag: {
       type: Number,
       required: true,
-      enum: [0, 1, 2, 3, 4, 5], // SuperAdmin - 0 , OrganizationAdmin - 1 , ParentsOrg - 2 , TeachersOrg - 3 , parentsGlobal - 4 , teachersGlobal - 5
+      enum: [0, 1, 2, 3, 4, 5, 6], // SuperAdmin - 0 , OrganizationAdmin - 1 , ParentsOrg - 2 , TeachersOrg - 3 , parentsGlobal - 4 , teachersGlobal - 5 ,  zonalAdmin - 6
     },
     status: {
       type: Number,

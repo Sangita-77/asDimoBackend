@@ -125,11 +125,11 @@ export const bookAppoinmentSer = async (parentId, teacherId, date, time) => {
     throw new Error("You already requested this slot");
   }
 
-  // 4. Create appointment with availabilityId ✅
+
   const appointment = await Appointment.create({
     parentId,
     teacherId,
-    availabilityId: availability._id, // 🔥 IMPORTANT
+    availabilityId: availability._id,
     date,
     time,
     status: "pending",

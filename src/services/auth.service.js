@@ -4,6 +4,7 @@ import Teacher from "../models/teachers.model.js";
 import SuperAdmin from "../models/superAdmin.model.js";
 import OrganizationAdmin from "../models/organizationAdmin.model.js";
 import BlacklistLog from "../models/blacklistLog.model.js";
+import ZonalAdmin from "../models/zonalAdmin.model.js";
 import mongoose from "mongoose";
 import { generateToken } from "../utils/jwt.js";
 import { sendEmail } from "../utils/sendEmail.js";
@@ -141,6 +142,19 @@ export const registerUser = async (userData) => {
                 userId: user.userId,
                 user: user._id,
                 organizationId: flag === 3 ? organizationUserIdForPT : null,
+              },
+            ],
+            { session }
+          );
+          roleDoc = roleDoc[0];
+        } else if (flag === 6) {
+          roleDoc = await ZonalAdmin.create(
+            [
+              {
+                zonalAdminId: user.userId,
+                userId: user.userId,
+                user: user._id,
+                address: userData.address,
               },
             ],
             { session }
