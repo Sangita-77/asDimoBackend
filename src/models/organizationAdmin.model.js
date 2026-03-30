@@ -35,6 +35,22 @@ const organizationAdminSchema = new mongoose.Schema(
       type: Number,
       required: true,
     },
+    city: {
+      type: String,
+      required: true,
+      index: true
+    },
+    state: {
+      type: String,
+      required: true,
+      index: true
+    },
+    pincode: {
+      type: String,
+      required: true,
+      index: true
+    },
+    address: String
 
     // TODO: add more org-admin-specific fields/permissions here.
   },

@@ -17,11 +17,22 @@ const zonalAdminSchema = new mongoose.Schema(
       ref: "User",
       required: true,
     },
-    address: {
-      type: String,
-      required: true,
-      trim: true,
+    city: {
+        type: String,
+        required: true,
+        index: true
     },
+    state: {
+        type: String,
+        required: true,
+        index: true
+    },
+    pincode: {
+        type: String,
+        required: true,
+        index: true
+    },
+    address: String
   },
   { timestamps: true }
 );

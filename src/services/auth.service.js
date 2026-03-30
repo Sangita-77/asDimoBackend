@@ -126,6 +126,10 @@ export const registerUser = async (userData) => {
                 organizationId: user.userId,
                 organization_type: Number(userData.organization_type),
                 zonalAdminId: zonalAdminExists.zonalAdminId,
+                city : userData.city,
+                state : userData.state,
+                pincode : userData.pincode,
+                address : userData.address,
               },
             ],
             { session }
@@ -164,7 +168,10 @@ export const registerUser = async (userData) => {
                 zonalAdminId: user.userId,
                 userId: user.userId,
                 user: user._id,
-                address: userData.address,
+                city : userData.city,
+                state : userData.state,
+                pincode : userData.pincode,
+                address : userData.address,
               },
             ],
             { session }
@@ -208,8 +215,12 @@ export const registerUser = async (userData) => {
               organizationId: user.userId,
               organization_type: Number(userData.organization_type),
               zonalAdminId: zonalAdminExists.zonalAdminId,
+              city : userData.city,
+              state : userData.state,
+              pincode : userData.pincode,
+              address : userData.address,
             });
-          } else if (flag === 2 || flag === 4) {
+          }else if (flag === 2 || flag === 4) {
             roleDoc = await Parent.create({
               parentId: user.userId,
               userId: user.userId,
@@ -223,6 +234,16 @@ export const registerUser = async (userData) => {
               user: user._id,
               organizationId: flag === 3 ? organizationUserIdForPT : null,
             });
+          } else if (flag === 6) {
+            roleDoc = await ZonalAdmin.create({
+                  zonalAdminId: user.userId,
+                  userId: user.userId,
+                  user: user._id,
+                  city : userData.city,
+                  state : userData.state,
+                  pincode : userData.pincode,
+                  address : userData.address,
+                });
           } else {
             const error = new Error("Invalid flag value");
             error.statusCode = 400;
