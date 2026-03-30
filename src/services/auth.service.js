@@ -390,6 +390,108 @@ export const logoutUser = async (token) => {
   return true;
 };
 
+// export const updateUserService = async (userId, userData) => {
+//   const session = await mongoose.startSession();
+
+//   let user;
+//   let roleDoc;
+
+//   try {
+//     await session.withTransaction(async () => {
+
+//       // 1. Find existing user
+//       user = await User.findById(userId).session(session);
+//       if (!user) {
+//         const error = new Error("User not found");
+//         error.statusCode = 404;
+//         throw error;
+//       }
+
+//       const flag = Number(userData.flag ?? user.flag);
+
+//       // 2. Validate conditions
+//       if (flag === 1 && userData.organization_type === undefined) {
+//         throw new Error("organization_type is required for Organization Admin");
+//       }
+
+//       if (flag === 1 && ![0, 1].includes(Number(userData.organization_type))) {
+//         throw new Error("organization_type must be 0 (Clinic) or 1 (School)");
+//       }
+
+//       if ((flag === 2 || flag === 3) && !userData.organizationId) {
+//         throw new Error("organizationId is required for flag 2 and 3");
+//       }
+
+//       // 3. Update USER
+//       user.name = userData.name ?? user.name;
+//       user.email = userData.email ?? user.email;
+//       user.flag = flag;
+
+//       await user.save({ session });
+
+//       // 4. Update ROLE COLLECTION
+//       if (flag === 0) {
+//         roleDoc = await SuperAdmin.findOneAndUpdate(
+//           { userId: user.userId },
+//           {},
+//           { new: true, session }
+//         );
+//       }
+
+//       else if (flag === 1) {
+//         roleDoc = await OrganizationAdmin.findOneAndUpdate(
+//           { userId: user.userId },
+//           {
+//             organization_type: Number(userData.organization_type),
+//           },
+//           { new: true, session }
+//         );
+//       }
+
+//       else if (flag === 2 || flag === 4) {
+//         roleDoc = await Parent.findOneAndUpdate(
+//           { userId: user.userId },
+//           {
+//             organizationId: flag === 2 ? Number(userData.organizationId) : null,
+//           },
+//           { new: true, session }
+//         );
+//       }
+
+//       else if (flag === 3 || flag === 5) {
+//         roleDoc = await Teacher.findOneAndUpdate(
+//           { userId: user.userId },
+//           {
+//             organizationId: flag === 3 ? Number(userData.organizationId) : null,
+//           },
+//           { new: true, session }
+//         );
+//       }
+
+//       else {
+//         throw new Error("Invalid flag");
+//       }
+//     });
+
+//     session.endSession();
+
+//     const userObj = user.toObject();
+//     delete userObj.password;
+
+//     return {
+//       user: userObj,
+//       role: roleDoc
+//         ? { collection: roleDoc.constructor.modelName, _id: roleDoc._id }
+//         : null,
+//     };
+
+//   } catch (error) {
+//     session.endSession();
+//     throw error;
+//   }
+// };
+
+
 export const updateUserService = async (userId, userData) => {
   const session = await mongoose.startSession();
 
@@ -399,37 +501,68 @@ export const updateUserService = async (userId, userData) => {
   try {
     await session.withTransaction(async () => {
 
-      // 1. Find existing user
+      // 1. Find user
       user = await User.findById(userId).session(session);
       if (!user) {
-        const error = new Error("User not found");
-        error.statusCode = 404;
-        throw error;
+        throw new Error("User not found");
       }
 
       const flag = Number(userData.flag ?? user.flag);
 
-      // 2. Validate conditions
-      if (flag === 1 && userData.organization_type === undefined) {
-        throw new Error("organization_type is required for Organization Admin");
+      let zonalAdminExists = null;
+
+      if (flag === 1) {
+        const { city, state, pincode } = userData;
+
+        if (!city || !state || !pincode) {
+          throw new Error("city, state, pincode required");
+        }
+
+        zonalAdminExists = await ZonalAdmin.findOne({
+          city,
+          state,
+          pincode
+        });
+
+        if (!zonalAdminExists) {
+          zonalAdminExists = await ZonalAdmin.findOne({
+            city,
+            state
+          });
+        }
+
+        if (!zonalAdminExists) {
+          const suggestions = await ZonalAdmin.find({ state })
+            .limit(3)
+            .select("zonalAdminId city state pincode");
+
+          const error = new Error("No zonal admin found");
+          error.suggestions = suggestions;
+          throw error;
+        }
       }
 
-      if (flag === 1 && ![0, 1].includes(Number(userData.organization_type))) {
-        throw new Error("organization_type must be 0 (Clinic) or 1 (School)");
+      if (flag === 1) {
+        if (userData.organization_type === undefined) {
+          throw new Error("organization_type required");
+        }
+
+        if (![0, 1].includes(Number(userData.organization_type))) {
+          throw new Error("organization_type must be 0 or 1");
+        }
       }
 
       if ((flag === 2 || flag === 3) && !userData.organizationId) {
-        throw new Error("organizationId is required for flag 2 and 3");
+        throw new Error("organizationId required");
       }
 
-      // 3. Update USER
       user.name = userData.name ?? user.name;
       user.email = userData.email ?? user.email;
       user.flag = flag;
 
       await user.save({ session });
 
-      // 4. Update ROLE COLLECTION
+
       if (flag === 0) {
         roleDoc = await SuperAdmin.findOneAndUpdate(
           { userId: user.userId },
@@ -443,6 +576,11 @@ export const updateUserService = async (userId, userData) => {
           { userId: user.userId },
           {
             organization_type: Number(userData.organization_type),
+            zonalAdminId: zonalAdminExists.zonalAdminId,
+            city: userData.city,
+            state: userData.state,
+            pincode: userData.pincode,
+            address: userData.address
           },
           { new: true, session }
         );
@@ -468,9 +606,23 @@ export const updateUserService = async (userId, userData) => {
         );
       }
 
+      else if (flag === 6) {
+        roleDoc = await ZonalAdmin.findOneAndUpdate(
+          { userId: user.userId },
+          {
+            city: userData.city,
+            state: userData.state,
+            pincode: userData.pincode,
+            address: userData.address
+          },
+          { new: true, session }
+        );
+      }
+
       else {
         throw new Error("Invalid flag");
       }
+
     });
 
     session.endSession();

@@ -148,9 +148,39 @@ export const logout = asyncHandler(async (req, res) => {
 });
 
 
+// export const updateUser = asyncHandler(async (req, res) => {
+//   const userId = req.params.id;
+//   const { name, email, flag, organizationId, organization_type } = req.body;
+
+//   const result = await updateUserService(userId, {
+//     name,
+//     email,
+//     flag,
+//     organizationId,
+//     organization_type,
+//   });
+
+//   res.status(200).json({
+//     success: true,
+//     message: "User updated successfully",
+//     data: result,
+//   });
+// });
+
 export const updateUser = asyncHandler(async (req, res) => {
   const userId = req.params.id;
-  const { name, email, flag, organizationId, organization_type } = req.body;
+
+  const {
+    name,
+    email,
+    flag,
+    organizationId,
+    organization_type,
+    city,
+    state,
+    pincode,
+    address
+  } = req.body;
 
   const result = await updateUserService(userId, {
     name,
@@ -158,6 +188,10 @@ export const updateUser = asyncHandler(async (req, res) => {
     flag,
     organizationId,
     organization_type,
+    city,
+    state,
+    pincode,
+    address
   });
 
   res.status(200).json({
