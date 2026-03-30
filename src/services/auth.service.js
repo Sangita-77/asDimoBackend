@@ -37,19 +37,28 @@ export const registerUser = async (userData) => {
     const flag = Number(userData.flag);
 
 
-    // organization_type required for organization admin
+    let zonalAdminExists = null;
+
     if (flag === 1) {
-      if (userData.organization_type === undefined) {
-        const error = new Error("organization_type is required for Organization Admin");
+      if (!userData.zonalAdminId) {
+        const error = new Error("zonalAdminId is required for Organization Admin");
         error.statusCode = 400;
         throw error;
       }
 
-      const orgType = Number(userData.organization_type);
+      const zonalAdminId = Number(userData.zonalAdminId);
 
-      if (![0, 1].includes(orgType)) {
-        const error = new Error("organization_type must be 0 (Clinic) or 1 (School)");
+      if (!Number.isFinite(zonalAdminId) || zonalAdminId <= 0) {
+        const error = new Error("Invalid zonalAdminId");
         error.statusCode = 400;
+        throw error;
+      }
+
+      zonalAdminExists = await ZonalAdmin.findOne({ zonalAdminId });
+
+      if (!zonalAdminExists) {
+        const error = new Error("Zonal Admin not found with given zonalAdminId");
+        error.statusCode = 404;
         throw error;
       }
     }
@@ -116,6 +125,7 @@ export const registerUser = async (userData) => {
                 // for OrganizationAdmin, organizationId is this same user's userId
                 organizationId: user.userId,
                 organization_type: Number(userData.organization_type),
+                zonalAdminId: zonalAdminExists.zonalAdminId,
               },
             ],
             { session }
@@ -195,8 +205,9 @@ export const registerUser = async (userData) => {
               adminId: user.userId,
               userId: user.userId,
               user: user._id,
-              // for OrganizationAdmin, organizationId is this same user's userId
               organizationId: user.userId,
+              organization_type: Number(userData.organization_type),
+              zonalAdminId: zonalAdminExists.zonalAdminId,
             });
           } else if (flag === 2 || flag === 4) {
             roleDoc = await Parent.create({

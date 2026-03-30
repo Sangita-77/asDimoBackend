@@ -10,7 +10,7 @@ import { asyncHandler } from "../utils/asyncHandler.js";
 
 
 export const register = asyncHandler(async (req, res) => {
-  const { name, email, flag, organizationId, organization_type ,address } = req.body;
+  const { name, email, flag, organizationId, organization_type ,address,zonalAdminId } = req.body;
 
   if (!name || !email || flag === undefined || flag === null) {
     return res.status(400).json({
@@ -25,6 +25,13 @@ export const register = asyncHandler(async (req, res) => {
     return res.status(400).json({
       success: false,
       message: "address is required for Zonal Admin",
+    });
+  }
+
+  if (numericFlag === 1 && !zonalAdminId) {
+    return res.status(400).json({
+      success: false,
+      message: "zonal admin id is required",
     });
   }
 
@@ -51,13 +58,23 @@ export const register = asyncHandler(async (req, res) => {
     });
   }
 
+  // const { user, generatedPassword, role } = await registerUser({
+  //   name,
+  //   email,
+  //   flag,
+  //   organizationId,
+  //   organization_type,
+  //   address
+  // });
+
   const { user, generatedPassword, role } = await registerUser({
     name,
     email,
     flag,
     organizationId,
     organization_type,
-    address
+    address,
+    zonalAdminId 
   });
 
   res.status(201).json({
