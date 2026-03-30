@@ -351,6 +351,9 @@ export const getUserById = async (userId) => {
   else if (user.flag === 3 || user.flag === 5) {
     roleData = await Teacher.findOne({ userId: user.userId });
   }
+  else if (user.flag === 6) {
+    roleData = await ZonalAdmin.findOne({ userId: user.userId });
+  } 
 
   return {
     user,
