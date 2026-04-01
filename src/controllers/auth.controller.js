@@ -179,7 +179,8 @@ export const updateUser = asyncHandler(async (req, res) => {
     city,
     state,
     pincode,
-    address
+    address,
+    status
   } = req.body;
 
   const result = await updateUserService(userId, {
@@ -191,7 +192,8 @@ export const updateUser = asyncHandler(async (req, res) => {
     city,
     state,
     pincode,
-    address
+    address,
+    status
   });
 
   res.status(200).json({

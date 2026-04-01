@@ -558,6 +558,7 @@ export const updateUserService = async (userId, userData) => {
 
       user.name = userData.name ?? user.name;
       user.email = userData.email ?? user.email;
+      user.status = userData.status ?? user.status;
       user.flag = flag;
 
       await user.save({ session });
