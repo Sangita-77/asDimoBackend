@@ -1,0 +1,8 @@
+RewriteEngine On
+
+# If file or folder exists, serve normally
+RewriteCond %{REQUEST_FILENAME} !-f
+RewriteCond %{REQUEST_FILENAME} !-d
+
+# Proxy all requests to Node app
+RewriteRule ^(.*)$ http://127.0.0.1:4000/$1 [P,L]

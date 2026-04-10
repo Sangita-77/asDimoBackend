@@ -643,3 +643,58 @@ export const updateUserService = async (userId, userData) => {
     throw error;
   }
 };
+
+export const deleteUserService = async (userId) => {
+  const session = await mongoose.startSession();
+
+  try {
+    let user;
+
+    await session.withTransaction(async () => {
+
+      user = await User.findById(userId).session(session);
+
+      if (!user) {
+        throw new Error("User not found");
+      }
+
+      const flag = user.flag;
+
+      if (flag === 0) {
+        await SuperAdmin.deleteOne({ userId: user.userId }).session(session);
+      }
+
+      else if (flag === 1) {
+        await OrganizationAdmin.deleteOne({ userId: user.userId }).session(session);
+      }
+
+      else if (flag === 2 || flag === 4) {
+        await Parent.deleteOne({ userId: user.userId }).session(session);
+      }
+
+      else if (flag === 3 || flag === 5) {
+        await Teacher.deleteOne({ userId: user.userId }).session(session);
+      }
+
+      else if (flag === 6) {
+        await ZonalAdmin.deleteOne({ userId: user.userId }).session(session);
+      }
+
+      else {
+        throw new Error("Invalid flag");
+      }
+
+
+      await User.deleteOne({ _id: userId }).session(session);
+
+    });
+
+    session.endSession();
+
+    return { success: true, message: "User deleted successfully" };
+
+  } catch (error) {
+    session.endSession();
+    throw error;
+  }
+};
