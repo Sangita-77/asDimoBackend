@@ -5,6 +5,7 @@ import {
   getAllUsersService,
   logoutUser,
   updateUserService,
+  deleteUserService,
 } from "../services/auth.service.js";
 import { asyncHandler } from "../utils/asyncHandler.js";
 
@@ -200,5 +201,16 @@ export const updateUser = asyncHandler(async (req, res) => {
     success: true,
     message: "User updated successfully",
     data: result,
+  });
+});
+
+export const deleteUserCon = asyncHandler(async (req, res) => {
+  const userId = req.userId;
+
+  const result = await deleteUserService(userId);
+
+  res.status(200).json({
+    success: true,
+    message: result.message,
   });
 });

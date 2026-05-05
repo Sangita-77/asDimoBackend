@@ -5,7 +5,8 @@ import {
     getProfile,
     getAllUsers,
     updateUser,
-    logout 
+    logout,
+    deleteUserCon
 } from "./controllers/auth.controller.js";
 import { 
     addAssesment,
@@ -32,6 +33,8 @@ router.post("/v1/auth/login", login);
 router.get("/v1/auth/profile", authenticate, protect , getProfile);
 router.get("/v1/auth/getAllUsers", authenticate, protect , getAllUsers);
 router.put("/v1/auth/updateUser/:id", authenticate, protect , updateUser);
+
+router.put("/v1/auth/deleteUserCon", authenticate, protect , deleteUserCon);
 
 router.post("/v1/auth/logout", protect, logout);
 
