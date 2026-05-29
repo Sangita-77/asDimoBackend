@@ -698,3 +698,118 @@ export const deleteUserService = async (userId) => {
     throw error;
   }
 };
+
+// Generate 5-digit OTP
+const generateOTP = () => {
+  return Math.floor(10000 + Math.random() * 90000).toString();
+};
+
+// Verify email and send OTP
+export const verifyEmailAndSendOTP = async (email) => {
+  const user = await User.findOne({ email });
+
+  if (!user) {
+    const error = new Error("Email not registered in the system");
+    error.statusCode = 404;
+    throw error;
+  }
+
+  // Generate 5-digit OTP
+  const otp = generateOTP();
+
+  // Set OTP expiry to 10 minutes
+  const otpExpiry = new Date(Date.now() + 10 * 60 * 1000);
+
+  // Update user with OTP and expiry
+  user.resetPasswordOTP = otp;
+  user.resetPasswordOTPExpiry = otpExpiry;
+  await user.save();
+
+  // Send OTP to email
+  await sendEmail(
+    email,
+    "Password Reset OTP",
+    `
+      <h2>Password Reset Request</h2>
+      <p>Hello ${user.name},</p>
+      <p>Your OTP for password reset is:</p>
+      <h1 style="color: #007bff; font-size: 32px; letter-spacing: 2px;">${otp}</h1>
+      <p>This OTP is valid for 10 minutes.</p>
+      <p>If you didn't request this, please ignore this email.</p>
+    `
+  );
+
+  return { success: true, message: "OTP sent to your registered email", email };
+};
+
+// Validate OTP
+export const validateOTP = async (email, otp) => {
+  const user = await User.findOne({ email });
+
+  if (!user) {
+    const error = new Error("User not found");
+    error.statusCode = 404;
+    throw error;
+  }
+
+  if (!user.resetPasswordOTP) {
+    const error = new Error("No OTP request found. Please request a password reset first.");
+    error.statusCode = 400;
+    throw error;
+  }
+
+  // Check if OTP matches
+  if (user.resetPasswordOTP !== otp) {
+    const error = new Error("Invalid OTP");
+    error.statusCode = 400;
+    throw error;
+  }
+
+  // Check if OTP has expired
+  if (new Date() > user.resetPasswordOTPExpiry) {
+    const error = new Error("OTP has expired. Please request a new one.");
+    error.statusCode = 400;
+    throw error;
+  }
+
+  return { success: true, message: "OTP validated successfully", userId: user._id };
+};
+
+// Reset password with OTP
+export const resetPasswordWithOTP = async (email, otp, newPassword) => {
+  const user = await User.findOne({ email });
+
+  if (!user) {
+    const error = new Error("User not found");
+    error.statusCode = 404;
+    throw error;
+  }
+
+  if (!user.resetPasswordOTP) {
+    const error = new Error("No OTP request found");
+    error.statusCode = 400;
+    throw error;
+  }
+
+  // Validate OTP
+  if (user.resetPasswordOTP !== otp) {
+    const error = new Error("Invalid OTP");
+    error.statusCode = 400;
+    throw error;
+  }
+
+  // Check if OTP has expired
+  if (new Date() > user.resetPasswordOTPExpiry) {
+    const error = new Error("OTP has expired");
+    error.statusCode = 400;
+    throw error;
+  }
+
+  // Update password
+  user.password = newPassword;
+  user.resetPasswordOTP = null;
+  user.resetPasswordOTPExpiry = null;
+  await user.save();
+
+  return { success: true, message: "Password updated successfully" };
+};

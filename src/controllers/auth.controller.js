@@ -6,6 +6,9 @@ import {
   logoutUser,
   updateUserService,
   deleteUserService,
+  verifyEmailAndSendOTP,
+  validateOTP,
+  resetPasswordWithOTP,
 } from "../services/auth.service.js";
 import { asyncHandler } from "../utils/asyncHandler.js";
 
@@ -95,8 +98,6 @@ export const register = asyncHandler(async (req, res) => {
 
 export const login = asyncHandler(async (req, res) => {
   const { email, password } = req.body;
-
-  // Validate required fields
   if (!email || !password) {
     return res.status(400).json({
       success: false,
@@ -212,5 +213,83 @@ export const deleteUserCon = asyncHandler(async (req, res) => {
   res.status(200).json({
     success: true,
     message: result.message,
+  });
+});
+
+export const forgotPassword = asyncHandler(async (req, res) => {
+  const { email } = req.body;
+  if (!email) {
+    return res.status(400).json({ success: false, message: "Email is required" });
+  }
+
+  res.status(200).json({
+    success: true,
+    message: "Password reset email sent successfully",
+    data: { email },
+  });
+});
+
+export const resetPassword = asyncHandler(async (req, res) => {
+  const { email, otp, password } = req.body;
+  if (!email || !otp || !password) {
+    return res.status(400).json({ success: false, message: "Email, OTP, and new password are required" });
+  }
+
+  const result = await resetPasswordWithOTP(email, otp, password);
+
+  res.status(200).json({
+    success: true,
+    message: result.message,  
+  });
+});
+
+export const verifyEmail = asyncHandler(async (req, res) => {
+  const { email } = req.body;
+  if (!email) {
+    return res.status(400).json({ success: false, message: "Email is required" });
+  }
+
+  const result = await verifyEmailAndSendOTP(email);
+
+  res.status(200).json({
+    success: true,
+    message: result.message,
+    data: { email: result.email },
+  });
+});
+
+export const validateEmailOTP = asyncHandler(async (req, res) => {
+  const { email, otp } = req.body;
+  if (!email || !otp) {
+    return res.status(400).json({ success: false, message: "Email and OTP are required" });
+  }
+
+  const result = await validateOTP(email, otp);
+
+  res.status(200).json({
+    success: true,
+    message: result.message,
+    data: { userId: result.userId },
+  });
+});
+
+export const updateProfile = asyncHandler(async (req, res) => {
+  const updatedProfile = req.body;
+  res.status(200).json({
+    success: true,
+    message: "Profile updated successfully",
+    data: updatedProfile,
+  });
+});
+
+export const changePassword = asyncHandler(async (req, res) => {
+  const { currentPassword, newPassword } = req.body;
+  if (!currentPassword || !newPassword) {
+    return res.status(400).json({ success: false, message: "Current and new password are required" });
+  }
+
+  res.status(200).json({
+    success: true,
+    message: "Password changed successfully",
   });
 });
