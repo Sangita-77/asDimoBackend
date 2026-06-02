@@ -6,6 +6,7 @@ import {
   logoutUser,
   refreshAuthToken,
   updateUserService,
+  updateProfileById,
   deleteUserService,
   verifyEmailAndSendOTP,
   validateOTP,
@@ -233,6 +234,57 @@ export const logout = asyncHandler(async (req, res) => {
 //   });
 // });
 
+// export const updateUser = asyncHandler(async (req, res) => {
+//   const userId = req.params.id;
+
+//   const {
+//     name,
+//     email,
+//     flag,
+//     organizationId,
+//     organization_type,
+//     superAdminId,
+//     zonalAdminId,
+//     adminId,
+//     organizationAdminId,
+//     therapistId,
+//     teacherId,
+//     city,
+//     state,
+//     pincode,
+//     address,
+//     status,
+//     profileImg
+//   } = req.body;
+
+//   const result = await updateUserService(userId, {
+//     name,
+//     email,
+//     flag,
+//     organizationId,
+//     organization_type,
+//     superAdminId,
+//     zonalAdminId,
+//     adminId,
+//     organizationAdminId,
+//     therapistId,
+//     teacherId,
+//     city,
+//     state,
+//     pincode,
+//     address,
+//     status,
+//     profileImg
+//   });
+
+//   res.status(200).json({
+//     success: true,
+//     message: "User updated successfully",
+//     data: result,
+//   });
+// });
+
+
 export const updateUser = asyncHandler(async (req, res) => {
   const userId = req.params.id;
 
@@ -252,8 +304,12 @@ export const updateUser = asyncHandler(async (req, res) => {
     state,
     pincode,
     address,
-    status
+    status,
   } = req.body;
+
+  const profileImg = req.file
+    ? `/uploads/profile/${req.file.filename}`
+    : req.body.profileImg;
 
   const result = await updateUserService(userId, {
     name,
@@ -271,7 +327,8 @@ export const updateUser = asyncHandler(async (req, res) => {
     state,
     pincode,
     address,
-    status
+    status,
+    profileImg,
   });
 
   res.status(200).json({
@@ -350,7 +407,19 @@ export const validateEmailOTP = asyncHandler(async (req, res) => {
 });
 
 export const updateProfile = asyncHandler(async (req, res) => {
-  const updatedProfile = req.body;
+
+  const profileData = {
+    ...req.body,
+    profileImg: req.file
+      ? `/uploads/profile/${req.file.filename}`
+      : req.body.profileImg,
+  };
+
+  const updatedProfile = await updateProfileById(
+    req.user._id,
+    profileData
+  );
+
   res.status(200).json({
     success: true,
     message: "Profile updated successfully",

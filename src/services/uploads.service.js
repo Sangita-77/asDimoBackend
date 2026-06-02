@@ -8,16 +8,25 @@ export const uploadProfileImage = async (userId, fileData) => {
     throw error;
   }
 
+  const user = await User.findById(userId);
+  if (!user) {
+    const error = new Error("User not found");
+    error.statusCode = 404;
+    throw error;
+  }
+
   const upload = await Upload.create({
-    userId,
-    fileType: "profile_image",
-    fileName: fileData.filename || fileData.originalname,
+    userId: user.userId,
+    type: "profile_image",
     filePath: fileData.path || fileData.destination,
-    fileSize: fileData.size,
-    mimeType: fileData.mimetype,
+    metadata: {
+      fileName: fileData.filename || fileData.originalname,
+      fileSize: fileData.size,
+      mimeType: fileData.mimetype,
+    },
   });
 
-  await User.findOneAndUpdate({ userId }, { profileImage: upload._id }, { new: true });
+  await User.findByIdAndUpdate(user._id, { profileImg: upload.filePath }, { new: true });
   return upload;
 };
 
@@ -31,11 +40,13 @@ export const uploadStudentDocuments = async (studentId, filesData) => {
   const uploads = await Upload.insertMany(
     filesData.map((file) => ({
       studentId,
-      fileType: "student_document",
-      fileName: file.filename || file.originalname,
+      type: "student_document",
       filePath: file.path || file.destination,
-      fileSize: file.size,
-      mimeType: file.mimetype,
+      metadata: {
+        fileName: file.filename || file.originalname,
+        fileSize: file.size,
+        mimeType: file.mimetype,
+      },
     }))
   );
 
@@ -52,11 +63,13 @@ export const uploadReports = async (uploadedBy, filesData) => {
   const uploads = await Upload.insertMany(
     filesData.map((file) => ({
       uploadedBy,
-      fileType: "report",
-      fileName: file.filename || file.originalname,
+      type: "report",
       filePath: file.path || file.destination,
-      fileSize: file.size,
-      mimeType: file.mimetype,
+      metadata: {
+        fileName: file.filename || file.originalname,
+        fileSize: file.size,
+        mimeType: file.mimetype,
+      },
     }))
   );
 

@@ -38,6 +38,11 @@ const userSchema = new mongoose.Schema(
       default: 1, // 1 = Active, 0 = Inactive
       enum: [0, 1],
     },
+    profileImg: {
+      type: String,
+      default: null,
+      trim: true,
+    },
     resetPasswordOTP: {
       type: String,
       default: null,

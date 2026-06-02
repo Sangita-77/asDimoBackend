@@ -480,6 +480,45 @@ export const getUserById = async (userId) => {
   };
 };
 
+export const updateProfileById = async (
+  userId,
+  profileData
+  ) => {
+
+  const allowedUpdates = {};
+
+  if (profileData.name !== undefined) {
+    allowedUpdates.name = profileData.name;
+  }
+
+  if (profileData.email !== undefined) {
+    allowedUpdates.email = profileData.email;
+  }
+
+  if (profileData.profileImg !== undefined) {
+    allowedUpdates.profileImg =
+      profileData.profileImg;
+  }
+
+  const user = await User.findByIdAndUpdate(
+    userId,
+    allowedUpdates,
+    {
+      returnDocument: "after",
+      runValidators: true,
+      context: "query",
+    }
+  ).select("-password");
+
+  if (!user) {
+    const error = new Error("User not found");
+    error.statusCode = 404;
+    throw error;
+  }
+
+  return user;
+};
+
 export const getAllUsersService = async () => {
   const users = await User.find().select("-password");
 
@@ -712,6 +751,7 @@ export const updateUserService = async (userId, userData) => {
       user.name = userData.name ?? user.name;
       user.email = userData.email ?? user.email;
       user.status = userData.status ?? user.status;
+      user.profileImg = userData.profileImg ?? user.profileImg;
       user.flag = flag;
 
       await user.save({ session });
@@ -721,7 +761,10 @@ export const updateUserService = async (userId, userData) => {
         roleDoc = await SuperAdmin.findOneAndUpdate(
           { userId: user.userId },
           {},
-          { new: true, session }
+          {
+            returnDocument: "after",
+            session
+          }
         );
       }
 
@@ -737,7 +780,10 @@ export const updateUserService = async (userId, userData) => {
             pincode: userData.pincode,
             address: userData.address
           },
-          { new: true, session }
+          {
+            returnDocument: "after",
+            session
+          }
         );
       }
 
@@ -748,7 +794,10 @@ export const updateUserService = async (userId, userData) => {
             organizationId: flag === 2 ? parents.therapist.organizationId : null,
             therapistId: flag === 2 ? parents.therapist.teacherId : null,
           },
-          { new: true, session }
+          {
+            returnDocument: "after",
+            session
+          }
         );
       }
 
@@ -759,7 +808,10 @@ export const updateUserService = async (userId, userData) => {
             organizationId: flag === 3 ? parents.organizationAdmin.organizationId : null,
             organizationAdminId: flag === 3 ? parents.organizationAdmin.organizationAdminId : null,
           },
-          { new: true, session }
+          {
+            returnDocument: "after",
+            session
+          }
         );
       }
 
@@ -773,7 +825,10 @@ export const updateUserService = async (userId, userData) => {
             pincode: userData.pincode,
             address: userData.address
           },
-          { new: true, session }
+          {
+            returnDocument: "after",
+            session
+          }
         );
       }
 
@@ -788,7 +843,10 @@ export const updateUserService = async (userId, userData) => {
             address: userData.address,
             status: userData.status ?? user.status,
           },
-          { new: true, session }
+          {
+            returnDocument: "after",
+            session
+          }
         );
       }
 

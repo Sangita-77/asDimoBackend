@@ -20,6 +20,8 @@ import * as notificationsController from "./controllers/notifications.controller
 import { authenticate } from "./middlewares/auth.middleware.js";
 import { protect } from "./middlewares/protect.middleware.js";
 import { auditLogger } from "./middlewares/audit.middleware.js";
+import { uploadProfile } from "./middlewares/upload.js";
+
 
 const router = Router();
 
@@ -35,7 +37,9 @@ authRouter.post("/verify-email", authController.verifyEmail);
 authRouter.post("/validate-otp", authController.validateEmailOTP);
 authRouter.post("/reset-password", authController.resetPassword);
 authRouter.get("/profile", authenticate, protect, authController.getProfile);
-authRouter.put("/profile", authenticate, protect, authController.updateProfile);
+// authRouter.put("/profile", authenticate, protect, authController.updateProfile);
+authRouter.put("/updateProfile/:id",authenticate,protect,uploadProfile.single("profileImg"),authController.updateProfile);
+
 authRouter.put("/change-password", authenticate, protect, authController.changePassword);
 router.use("/auth", authRouter);
 
@@ -60,7 +64,11 @@ const usersRouter = Router();
 usersRouter.post("/", authenticate, protect, usersController.createUser);
 usersRouter.get("/", authenticate, protect, usersController.getUsers);
 usersRouter.get("/:id", authenticate, protect, usersController.getUserById);
-usersRouter.put("/:id", authenticate, protect, usersController.updateUserById);
+// usersRouter.put("/:id", authenticate, protect, usersController.updateUserById);
+
+// usersRouter.put("/:id",authenticate,protect,uploadProfile.single("profileImg"),usersController.updateUserById);
+
+
 usersRouter.patch("/status/:id", authenticate, protect, usersController.updateUserStatus);
 usersRouter.delete("/:id", authenticate, protect, usersController.deleteUserById);
 usersRouter.patch("/role/:id", authenticate, protect, usersController.updateUserRole);

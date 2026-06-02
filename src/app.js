@@ -15,6 +15,8 @@ app.use(rateLimit({ windowMs: 60_000, max: 120 }));
 
 app.use("/api", routes);
 
+app.use("/uploads", express.static("uploads"));
+
 // Global Error Handler
 app.use(errorMiddleware);
 
