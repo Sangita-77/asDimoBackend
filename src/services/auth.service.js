@@ -5,8 +5,14 @@ import SuperAdmin from "../models/superAdmin.model.js";
 import OrganizationAdmin from "../models/organizationAdmin.model.js";
 import BlacklistLog from "../models/blacklistLog.model.js";
 import ZonalAdmin from "../models/zonalAdmin.model.js";
+import Admin from "../models/admin.model.js";
+import RefreshToken from "../models/refreshToken.model.js";
 import mongoose from "mongoose";
-import { generateToken } from "../utils/jwt.js";
+import {
+  generateAccessToken,
+  generateRefreshToken,
+  verifyRefreshToken,
+} from "../utils/jwt.js";
 import { sendEmail } from "../utils/sendEmail.js";
 
 const generateRandomPassword = (length = 8) => {
@@ -17,6 +23,111 @@ const generateRandomPassword = (length = 8) => {
     password += chars.charAt(Math.floor(Math.random() * chars.length));
   }
   return password;
+};
+
+const getTokenExpiryDate = (token) => {
+  const decoded = JSON.parse(Buffer.from(token.split(".")[1], "base64url").toString("utf8"));
+  return new Date(decoded.exp * 1000);
+};
+
+const createRefreshTokenRecord = async (userId, userObjectId) => {
+  const refreshToken = generateRefreshToken(userId);
+
+  await RefreshToken.create({
+    token: refreshToken,
+    user: userObjectId,
+    expiresAt: getTokenExpiryDate(refreshToken),
+  });
+
+  return refreshToken;
+};
+
+const toPositiveNumber = (value, fieldName) => {
+  const number = Number(value);
+  if (!Number.isFinite(number) || number <= 0) {
+    const error = new Error(`Invalid ${fieldName}`);
+    error.statusCode = 400;
+    throw error;
+  }
+  return number;
+};
+
+const requireField = (value, fieldName, roleName) => {
+  if (value === undefined || value === null || value === "") {
+    const error = new Error(`${fieldName} is required for ${roleName}`);
+    error.statusCode = 400;
+    throw error;
+  }
+};
+
+const getRoleParents = async (flag, userData) => {
+  const parents = {};
+
+  if (flag === 6) {
+    requireField(userData.superAdminId, "superAdminId", "Zonal Admin");
+    const superAdminId = toPositiveNumber(userData.superAdminId, "superAdminId");
+    const superAdmin = await SuperAdmin.findOne({ adminId: superAdminId });
+    if (!superAdmin) {
+      const error = new Error("Super Admin not found with given superAdminId");
+      error.statusCode = 404;
+      throw error;
+    }
+    parents.superAdmin = superAdmin;
+  }
+
+  if (flag === 7) {
+    requireField(userData.zonalAdminId, "zonalAdminId", "Admin");
+    const zonalAdminId = toPositiveNumber(userData.zonalAdminId, "zonalAdminId");
+    const zonalAdmin = await ZonalAdmin.findOne({ zonalAdminId });
+    if (!zonalAdmin) {
+      const error = new Error("Zonal Admin not found with given zonalAdminId");
+      error.statusCode = 404;
+      throw error;
+    }
+    parents.zonalAdmin = zonalAdmin;
+  }
+
+  if (flag === 1) {
+    requireField(userData.adminId, "adminId", "Organization Admin");
+    const adminId = toPositiveNumber(userData.adminId, "adminId");
+    const admin = await Admin.findOne({ adminId });
+    if (!admin) {
+      const error = new Error("Admin not found with given adminId");
+      error.statusCode = 404;
+      throw error;
+    }
+    parents.admin = admin;
+  }
+
+  if (flag === 3) {
+    const orgAdminLookup = userData.organizationAdminId ?? userData.organizationId;
+    requireField(orgAdminLookup, "organizationAdminId", "Therapist");
+    const organizationAdminId = toPositiveNumber(orgAdminLookup, "organizationAdminId");
+    const organizationAdmin = await OrganizationAdmin.findOne({
+      $or: [{ organizationAdminId }, { organizationId: organizationAdminId }],
+    });
+    if (!organizationAdmin) {
+      const error = new Error("Organization Admin not found with given organizationAdminId");
+      error.statusCode = 404;
+      throw error;
+    }
+    parents.organizationAdmin = organizationAdmin;
+  }
+
+  if (flag === 2) {
+    const therapistLookup = userData.therapistId ?? userData.teacherId;
+    requireField(therapistLookup, "therapistId", "Parent");
+    const therapistId = toPositiveNumber(therapistLookup, "therapistId");
+    const therapist = await Teacher.findOne({ teacherId: therapistId });
+    if (!therapist) {
+      const error = new Error("Therapist not found with given therapistId");
+      error.statusCode = 404;
+      throw error;
+    }
+    parents.therapist = therapist;
+  }
+
+  return parents;
 };
 
 
@@ -37,49 +148,16 @@ export const registerUser = async (userData) => {
     const flag = Number(userData.flag);
 
 
-    let zonalAdminExists = null;
-
     if (flag === 1) {
-      if (!userData.zonalAdminId) {
-        const error = new Error("zonalAdminId is required for Organization Admin");
-        error.statusCode = 400;
-        throw error;
-      }
-
-      const zonalAdminId = Number(userData.zonalAdminId);
-
-      if (!Number.isFinite(zonalAdminId) || zonalAdminId <= 0) {
-        const error = new Error("Invalid zonalAdminId");
-        error.statusCode = 400;
-        throw error;
-      }
-
-      zonalAdminExists = await ZonalAdmin.findOne({ zonalAdminId });
-
-      if (!zonalAdminExists) {
-        const error = new Error("Zonal Admin not found with given zonalAdminId");
-        error.statusCode = 404;
-        throw error;
-      }
-    }
-
-    // If flag is 2 or 3, organizationId is required (stored only on Parent/Teacher docs)
-    // Here organizationId is the organization's users.userId (Number)
-    let organizationUserIdForPT = null;
-    if (flag === 2 || flag === 3) {
-      if (!userData.organizationId) {
-        const error = new Error("organizationId is required for flag 2 and 3");
-        error.statusCode = 400;
-        throw error;
-      }
-
-      organizationUserIdForPT = Number(userData.organizationId);
-      if (!Number.isFinite(organizationUserIdForPT) || organizationUserIdForPT <= 0) {
-        const error = new Error("Invalid organizationId");
+      requireField(userData.organization_type, "organization_type", "Organization Admin");
+      if (![0, 1].includes(Number(userData.organization_type))) {
+        const error = new Error("organization_type must be 0 (Clinic) or 1 (School)");
         error.statusCode = 400;
         throw error;
       }
     }
+
+    const parents = await getRoleParents(flag, userData);
 
     // Use transaction when available; fallback to manual rollback if transactions are not supported
     const session = await mongoose.startSession();
@@ -119,13 +197,14 @@ export const registerUser = async (userData) => {
           roleDoc = await OrganizationAdmin.create(
             [
               {
-                adminId: user.userId,
+                organizationAdminId: user.userId,
                 userId: user.userId,
                 user: user._id,
                 // for OrganizationAdmin, organizationId is this same user's userId
                 organizationId: user.userId,
+                adminId: parents.admin.adminId,
                 organization_type: Number(userData.organization_type),
-                zonalAdminId: zonalAdminExists.zonalAdminId,
+                zonalAdminId: parents.admin.zonalAdminId,
                 city : userData.city,
                 state : userData.state,
                 pincode : userData.pincode,
@@ -142,7 +221,8 @@ export const registerUser = async (userData) => {
                 parentId: user.userId,
                 userId: user.userId,
                 user: user._id,
-                organizationId: flag === 2 ? organizationUserIdForPT : null,
+                organizationId: flag === 2 ? parents.therapist.organizationId : null,
+                therapistId: flag === 2 ? parents.therapist.teacherId : null,
               },
             ],
             { session }
@@ -155,7 +235,8 @@ export const registerUser = async (userData) => {
                 teacherId: user.userId,
                 userId: user.userId,
                 user: user._id,
-                organizationId: flag === 3 ? organizationUserIdForPT : null,
+                organizationId: flag === 3 ? parents.organizationAdmin.organizationId : null,
+                organizationAdminId: flag === 3 ? parents.organizationAdmin.organizationAdminId : null,
               },
             ],
             { session }
@@ -168,10 +249,29 @@ export const registerUser = async (userData) => {
                 zonalAdminId: user.userId,
                 userId: user.userId,
                 user: user._id,
+                superAdminId: parents.superAdmin.adminId,
                 city : userData.city,
                 state : userData.state,
                 pincode : userData.pincode,
                 address : userData.address,
+              },
+            ],
+            { session }
+          );
+          roleDoc = roleDoc[0];
+        } else if (flag === 7) {
+          roleDoc = await Admin.create(
+            [
+              {
+                adminId: user.userId,
+                userId: user.userId,
+                user: user._id,
+                zonalAdminId: parents.zonalAdmin.zonalAdminId,
+                city: userData.city,
+                state: userData.state,
+                pincode: userData.pincode,
+                address: userData.address,
+                status: 1,
               },
             ],
             { session }
@@ -209,12 +309,13 @@ export const registerUser = async (userData) => {
             });
           } else if (flag === 1) {
             roleDoc = await OrganizationAdmin.create({
-              adminId: user.userId,
+              organizationAdminId: user.userId,
               userId: user.userId,
               user: user._id,
               organizationId: user.userId,
+              adminId: parents.admin.adminId,
               organization_type: Number(userData.organization_type),
-              zonalAdminId: zonalAdminExists.zonalAdminId,
+              zonalAdminId: parents.admin.zonalAdminId,
               city : userData.city,
               state : userData.state,
               pincode : userData.pincode,
@@ -225,25 +326,40 @@ export const registerUser = async (userData) => {
               parentId: user.userId,
               userId: user.userId,
               user: user._id,
-              organizationId: flag === 2 ? organizationUserIdForPT : null,
+              organizationId: flag === 2 ? parents.therapist.organizationId : null,
+              therapistId: flag === 2 ? parents.therapist.teacherId : null,
             });
           } else if (flag === 3 || flag === 5) {
             roleDoc = await Teacher.create({
               teacherId: user.userId,
               userId: user.userId,
               user: user._id,
-              organizationId: flag === 3 ? organizationUserIdForPT : null,
+              organizationId: flag === 3 ? parents.organizationAdmin.organizationId : null,
+              organizationAdminId: flag === 3 ? parents.organizationAdmin.organizationAdminId : null,
             });
           } else if (flag === 6) {
             roleDoc = await ZonalAdmin.create({
                   zonalAdminId: user.userId,
                   userId: user.userId,
                   user: user._id,
+                  superAdminId: parents.superAdmin.adminId,
                   city : userData.city,
                   state : userData.state,
                   pincode : userData.pincode,
                   address : userData.address,
                 });
+          } else if (flag === 7) {
+            roleDoc = await Admin.create({
+              adminId: user.userId,
+              userId: user.userId,
+              user: user._id,
+              zonalAdminId: parents.zonalAdmin.zonalAdminId,
+              city: userData.city,
+              state: userData.state,
+              pincode: userData.pincode,
+              address: userData.address,
+              status: 1,
+            });
           } else {
             const error = new Error("Invalid flag value");
             error.statusCode = 400;
@@ -318,14 +434,14 @@ export const loginUser = async (email, password) => {
     throw error;
   }
 
-  // Generate token
-  const token = generateToken(user._id.toString());
+  const token = generateAccessToken(user._id.toString());
+  const refreshToken = await createRefreshTokenRecord(user._id.toString(), user._id);
 
   // Remove password
   const userObject = user.toObject();
   delete userObject.password;
 
-  return { user: userObject, token };
+  return { user: userObject, token, accessToken: token, refreshToken };
 };
 
 export const getUserById = async (userId) => {
@@ -353,6 +469,9 @@ export const getUserById = async (userId) => {
   }
   else if (user.flag === 6) {
     roleData = await ZonalAdmin.findOne({ userId: user.userId });
+  }
+  else if (user.flag === 7) {
+    roleData = await Admin.findOne({ userId: user.userId });
   } 
 
   return {
@@ -375,7 +494,49 @@ export const getAllUsersService = async () => {
 
 
 
-export const logoutUser = async (token) => {
+export const refreshAuthToken = async (refreshToken) => {
+  if (!refreshToken) {
+    const error = new Error("Refresh token not provided");
+    error.statusCode = 400;
+    throw error;
+  }
+
+  const decoded = verifyRefreshToken(refreshToken);
+
+  const storedToken = await RefreshToken.findOne({
+    token: refreshToken,
+    revokedAt: null,
+  });
+
+  if (!storedToken || storedToken.expiresAt <= new Date()) {
+    const error = new Error("Refresh token is invalid or expired");
+    error.statusCode = 401;
+    throw error;
+  }
+
+  const user = await User.findById(decoded.userId).select("-password");
+
+  if (!user || user.status !== 1) {
+    const error = new Error("User not found or inactive");
+    error.statusCode = 401;
+    throw error;
+  }
+
+  storedToken.revokedAt = new Date();
+  await storedToken.save();
+
+  const token = generateAccessToken(user._id.toString());
+  const newRefreshToken = await createRefreshTokenRecord(user._id.toString(), user._id);
+
+  return {
+    user,
+    token,
+    accessToken: token,
+    refreshToken: newRefreshToken,
+  };
+};
+
+export const logoutUser = async (token, refreshToken) => {
   if (!token) {
     const error = new Error("Token not provided");
     error.statusCode = 400;
@@ -384,8 +545,15 @@ export const logoutUser = async (token) => {
 
   await BlacklistLog.create({
     token,
-    expiresAt: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000),
+    expiresAt: getTokenExpiryDate(token),
   });
+
+  if (refreshToken) {
+    await RefreshToken.findOneAndUpdate(
+      { token: refreshToken, revokedAt: null },
+      { revokedAt: new Date() }
+    );
+  }
 
   return true;
 };
@@ -509,36 +677,23 @@ export const updateUserService = async (userId, userData) => {
 
       const flag = Number(userData.flag ?? user.flag);
 
-      let zonalAdminExists = null;
-
-      if (flag === 1) {
-        const { city, state, pincode } = userData;
-
-        if (!city || !state || !pincode) {
-          throw new Error("city, state, pincode required");
-        }
-
-        zonalAdminExists = await ZonalAdmin.findOne({
-          city,
-          state,
-          pincode
-        });
-
-        if (!zonalAdminExists) {
-          zonalAdminExists = await ZonalAdmin.findOne({
-            city,
-            state
-          });
-        }
-
-        if (!zonalAdminExists) {
-          const suggestions = await ZonalAdmin.find({ state })
-            .limit(3)
-            .select("zonalAdminId city state pincode");
-
-          const error = new Error("No zonal admin found");
-          error.suggestions = suggestions;
-          throw error;
+      if (flag === user.flag) {
+        if (flag === 1) {
+          const existingRole = await OrganizationAdmin.findOne({ userId: user.userId }).session(session);
+          userData.adminId ??= existingRole?.adminId;
+          userData.organization_type ??= existingRole?.organization_type;
+        } else if (flag === 2) {
+          const existingRole = await Parent.findOne({ userId: user.userId }).session(session);
+          userData.therapistId ??= existingRole?.therapistId;
+        } else if (flag === 3) {
+          const existingRole = await Teacher.findOne({ userId: user.userId }).session(session);
+          userData.organizationAdminId ??= existingRole?.organizationAdminId;
+        } else if (flag === 6) {
+          const existingRole = await ZonalAdmin.findOne({ userId: user.userId }).session(session);
+          userData.superAdminId ??= existingRole?.superAdminId;
+        } else if (flag === 7) {
+          const existingRole = await Admin.findOne({ userId: user.userId }).session(session);
+          userData.zonalAdminId ??= existingRole?.zonalAdminId;
         }
       }
 
@@ -552,9 +707,7 @@ export const updateUserService = async (userId, userData) => {
         }
       }
 
-      if ((flag === 2 || flag === 3) && !userData.organizationId) {
-        throw new Error("organizationId required");
-      }
+      const parents = await getRoleParents(flag, userData);
 
       user.name = userData.name ?? user.name;
       user.email = userData.email ?? user.email;
@@ -577,7 +730,8 @@ export const updateUserService = async (userId, userData) => {
           { userId: user.userId },
           {
             organization_type: Number(userData.organization_type),
-            zonalAdminId: zonalAdminExists.zonalAdminId,
+            adminId: parents.admin.adminId,
+            zonalAdminId: parents.admin.zonalAdminId,
             city: userData.city,
             state: userData.state,
             pincode: userData.pincode,
@@ -591,7 +745,8 @@ export const updateUserService = async (userId, userData) => {
         roleDoc = await Parent.findOneAndUpdate(
           { userId: user.userId },
           {
-            organizationId: flag === 2 ? Number(userData.organizationId) : null,
+            organizationId: flag === 2 ? parents.therapist.organizationId : null,
+            therapistId: flag === 2 ? parents.therapist.teacherId : null,
           },
           { new: true, session }
         );
@@ -601,7 +756,8 @@ export const updateUserService = async (userId, userData) => {
         roleDoc = await Teacher.findOneAndUpdate(
           { userId: user.userId },
           {
-            organizationId: flag === 3 ? Number(userData.organizationId) : null,
+            organizationId: flag === 3 ? parents.organizationAdmin.organizationId : null,
+            organizationAdminId: flag === 3 ? parents.organizationAdmin.organizationAdminId : null,
           },
           { new: true, session }
         );
@@ -611,10 +767,26 @@ export const updateUserService = async (userId, userData) => {
         roleDoc = await ZonalAdmin.findOneAndUpdate(
           { userId: user.userId },
           {
+            superAdminId: parents.superAdmin.adminId,
             city: userData.city,
             state: userData.state,
             pincode: userData.pincode,
             address: userData.address
+          },
+          { new: true, session }
+        );
+      }
+
+      else if (flag === 7) {
+        roleDoc = await Admin.findOneAndUpdate(
+          { userId: user.userId },
+          {
+            zonalAdminId: parents.zonalAdmin.zonalAdminId,
+            city: userData.city,
+            state: userData.state,
+            pincode: userData.pincode,
+            address: userData.address,
+            status: userData.status ?? user.status,
           },
           { new: true, session }
         );
@@ -678,6 +850,10 @@ export const deleteUserService = async (userId) => {
 
       else if (flag === 6) {
         await ZonalAdmin.deleteOne({ userId: user.userId }).session(session);
+      }
+
+      else if (flag === 7) {
+        await Admin.deleteOne({ userId: user.userId }).session(session);
       }
 
       else {

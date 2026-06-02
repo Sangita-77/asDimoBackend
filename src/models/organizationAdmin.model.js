@@ -2,8 +2,7 @@ import mongoose from "mongoose";
 
 const organizationAdminSchema = new mongoose.Schema(
   {
-    // foreign key to users.userId for this organization admin
-    adminId: {
+    organizationAdminId: {
       type: Number,
       required: true,
       unique: true,
@@ -25,6 +24,13 @@ const organizationAdminSchema = new mongoose.Schema(
     organizationId: {
       type: Number,
       required: true,
+      unique: true,
+      index: true,
+    },
+    adminId: {
+      type: Number,
+      required: true,
+      index: true,
     },
     organization_type: {
       type: Number,

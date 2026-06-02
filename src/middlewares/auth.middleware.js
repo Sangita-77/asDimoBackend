@@ -1,5 +1,6 @@
 import { verifyToken } from "../utils/jwt.js";
 import User from "../models/user.model.js";
+import BlacklistLog from "../models/blacklistLog.model.js";
 
 /**
  * Authentication middleware to protect routes
@@ -19,6 +20,15 @@ export const authenticate = async (req, res, next) => {
 
     // Extract token (remove "Bearer " prefix)
     const token = authHeader.substring(7);
+
+    const blacklistedToken = await BlacklistLog.findOne({ token });
+
+    if (blacklistedToken) {
+      return res.status(401).json({
+        success: false,
+        message: "Token expired, please login again",
+      });
+    }
 
     // Verify token
     const decoded = verifyToken(token);

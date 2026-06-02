@@ -1,6 +1,7 @@
 import Assessment from "../models/assesment.model.js";
 import Availability from "../models/avialability.model.js";
 import Appointment from "../models/appoinment.model.js";
+import Parent from "../models/parents.model.js";
 
 
 export const assetmentTestService = async (testData) => {
@@ -87,6 +88,15 @@ export const assetmentTestService = async (testData) => {
 };
 
 export const bookAppoinmentSer = async (parentId, teacherId, date, time) => {
+  const parent = await Parent.findOne({ parentId: Number(parentId) });
+
+  if (!parent) {
+    throw new Error("Parent not found");
+  }
+
+  if (parent.therapistId !== Number(teacherId)) {
+    throw new Error("Parent is not assigned to this therapist");
+  }
 
   // 1. Check availability
   const availability = await Availability.findOne({

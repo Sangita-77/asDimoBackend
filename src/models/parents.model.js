@@ -25,8 +25,13 @@ const parentsSchema = new mongoose.Schema(
       default: null,
       index: true,
     },
+    therapistId: {
+      type: Number,
+      default: null,
+      index: true,
+    },
 
-    // TODO: add more teacher-specific fields here (phone, subject, etc.)
+    // TODO: add more parent-specific fields here (phone, child details, etc.)
   },
   { timestamps: true }
 );

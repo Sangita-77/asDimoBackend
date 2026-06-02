@@ -17,6 +17,11 @@ const zonalAdminSchema = new mongoose.Schema(
       ref: "User",
       required: true,
     },
+    superAdminId: {
+        type: Number,
+        required: true,
+        index: true
+    },
     city: {
         type: String,
         required: true,

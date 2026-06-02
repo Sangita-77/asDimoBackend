@@ -12,6 +12,14 @@ export const generateToken = (userId) => {
   });
 };
 
+export const generateAccessToken = generateToken;
+
+export const generateRefreshToken = (userId) => {
+  return jwt.sign({ userId, type: "refresh" }, env.JWT_REFRESH_SECRET, {
+    expiresIn: env.JWT_REFRESH_EXPIRES_IN,
+  });
+};
+
 /**
  * Verify and decode JWT token
  * @param {string} token - JWT token to verify
@@ -23,5 +31,19 @@ export const verifyToken = (token) => {
     return jwt.verify(token, env.JWT_SECRET);
   } catch (error) {
     throw new Error("Invalid or expired token");
+  }
+};
+
+export const verifyRefreshToken = (token) => {
+  try {
+    const decoded = jwt.verify(token, env.JWT_REFRESH_SECRET);
+
+    if (decoded.type !== "refresh") {
+      throw new Error("Invalid refresh token");
+    }
+
+    return decoded;
+  } catch (error) {
+    throw new Error("Invalid or expired refresh token");
   }
 };

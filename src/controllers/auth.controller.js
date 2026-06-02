@@ -4,6 +4,7 @@ import {
   getUserById,
   getAllUsersService,
   logoutUser,
+  refreshAuthToken,
   updateUserService,
   deleteUserService,
   verifyEmailAndSendOTP,
@@ -14,7 +15,23 @@ import { asyncHandler } from "../utils/asyncHandler.js";
 
 
 export const register = asyncHandler(async (req, res) => {
-  const { name, email, flag, organizationId, organization_type ,zonalAdminId,city,state,pincode,address } = req.body;
+  const {
+    name,
+    email,
+    flag,
+    organizationId,
+    organization_type,
+    superAdminId,
+    zonalAdminId,
+    adminId,
+    organizationAdminId,
+    therapistId,
+    teacherId,
+    city,
+    state,
+    pincode,
+    address
+  } = req.body;
 
   if (!name || !email || flag === undefined || flag === null) {
     return res.status(400).json({
@@ -25,17 +42,24 @@ export const register = asyncHandler(async (req, res) => {
 
   const numericFlag = Number(flag);
 
-  if (numericFlag === 6 && !city && !state && !pincode && !address) {
+  if (numericFlag === 6 && (!superAdminId || !city || !state || !pincode || !address)) {
     return res.status(400).json({
       success: false,
-      message: "full address is required for Zonal Admin",
+      message: "superAdminId and full address are required for Zonal Admin",
     });
   }
 
-  if (numericFlag === 1 && !city && !state && !pincode && !address && !zonalAdminId) {
+  if (numericFlag === 7 && (!zonalAdminId || !city || !state || !pincode || !address)) {
     return res.status(400).json({
       success: false,
-      message: "full address and zonal admin id is required",
+      message: "zonalAdminId and full address are required for Admin",
+    });
+  }
+
+  if (numericFlag === 1 && (!adminId || !city || !state || !pincode || !address)) {
+    return res.status(400).json({
+      success: false,
+      message: "adminId and full address are required for Organization Admin",
     });
   }
 
@@ -55,10 +79,17 @@ export const register = asyncHandler(async (req, res) => {
     });
   }
 
-  if ((numericFlag === 2 || numericFlag === 3) && !organizationId) {
+  if (numericFlag === 3 && !organizationAdminId && !organizationId) {
     return res.status(400).json({
       success: false,
-      message: "organizationId is required for flag 2 and 3",
+      message: "organizationAdminId is required for Therapist",
+    });
+  }
+
+  if (numericFlag === 2 && !therapistId && !teacherId) {
+    return res.status(400).json({
+      success: false,
+      message: "therapistId is required for Parent",
     });
   }
 
@@ -78,7 +109,12 @@ export const register = asyncHandler(async (req, res) => {
     organizationId,
     organization_type,
     address,
+    superAdminId,
     zonalAdminId,
+    adminId,
+    organizationAdminId,
+    therapistId,
+    teacherId,
     city,
     state,
     pincode
@@ -105,7 +141,7 @@ export const login = asyncHandler(async (req, res) => {
     });
   }
 
-  const { user, token } = await loginUser(email, password);
+  const { user, token, accessToken, refreshToken } = await loginUser(email, password);
 
   res.status(200).json({
     success: true,
@@ -113,6 +149,33 @@ export const login = asyncHandler(async (req, res) => {
     data: {
       user,
       token,
+      accessToken,
+      refreshToken,
+    },
+  });
+});
+
+export const refreshToken = asyncHandler(async (req, res) => {
+  const { refreshToken: tokenFromBody } = req.body;
+
+  if (!tokenFromBody) {
+    return res.status(400).json({
+      success: false,
+      message: "Refresh token is required",
+    });
+  }
+
+  const { user, token, accessToken, refreshToken: newRefreshToken } =
+    await refreshAuthToken(tokenFromBody);
+
+  res.status(200).json({
+    success: true,
+    message: "Token refreshed successfully",
+    data: {
+      user,
+      token,
+      accessToken,
+      refreshToken: newRefreshToken,
     },
   });
 });
@@ -140,8 +203,9 @@ export const getAllUsers = asyncHandler(async (req, res) => {
 
 export const logout = asyncHandler(async (req, res) => {
   const token = req.token; // coming from middleware
+  const { refreshToken } = req.body;
 
-  await logoutUser(token);
+  await logoutUser(token, refreshToken);
 
   res.status(200).json({
     success: true,
@@ -178,6 +242,12 @@ export const updateUser = asyncHandler(async (req, res) => {
     flag,
     organizationId,
     organization_type,
+    superAdminId,
+    zonalAdminId,
+    adminId,
+    organizationAdminId,
+    therapistId,
+    teacherId,
     city,
     state,
     pincode,
@@ -191,6 +261,12 @@ export const updateUser = asyncHandler(async (req, res) => {
     flag,
     organizationId,
     organization_type,
+    superAdminId,
+    zonalAdminId,
+    adminId,
+    organizationAdminId,
+    therapistId,
+    teacherId,
     city,
     state,
     pincode,

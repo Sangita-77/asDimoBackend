@@ -11,4 +11,6 @@ const blacklistlogSchema = new mongoose.Schema({
   },
 });
 
+blacklistlogSchema.index({ expiresAt: 1 }, { expireAfterSeconds: 0 });
+
 export default mongoose.model("BlacklistLog", blacklistlogSchema);

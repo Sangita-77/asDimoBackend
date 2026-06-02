@@ -5,6 +5,7 @@ import * as organizationController from "./controllers/organization.controller.j
 import * as usersController from "./controllers/users.controller.js";
 import * as studentsController from "./controllers/students.controller.js";
 import * as doctorsController from "./controllers/doctors.controller.js";
+import * as teacherController from "./controllers/teacher.controller.js";
 import * as evaluationsController from "./controllers/evaluations.controller.js";
 import * as questionsController from "./controllers/questions.controller.js";
 import * as appointmentsController from "./controllers/appointments.controller.js";
@@ -27,6 +28,7 @@ router.use(auditLogger);
 const authRouter = Router();
 authRouter.post("/register", authController.register);
 authRouter.post("/login", authController.login);
+authRouter.post("/refresh-token", authController.refreshToken);
 authRouter.post("/logout", authenticate, protect, authController.logout);
 authRouter.post("/forgot-password", authController.forgotPassword);
 authRouter.post("/verify-email", authController.verifyEmail);
@@ -84,6 +86,12 @@ doctorsRouter.delete("/:id", authenticate, protect, doctorsController.deleteDoct
 doctorsRouter.patch("/availability/:id", authenticate, protect, doctorsController.updateDoctorAvailability);
 doctorsRouter.patch("/assign-organization/:id", authenticate, protect, doctorsController.assignDoctorOrganization);
 router.use("/doctors", doctorsRouter);
+
+const therapistsRouter = Router();
+therapistsRouter.post("/availability", authenticate, protect, teacherController.addAvailabilityCon);
+therapistsRouter.get("/availability", authenticate, protect, teacherController.getAvailabilityWTCon);
+therapistsRouter.patch("/appointments/status", authenticate, protect, teacherController.approveAppointmentCon);
+router.use("/therapists", therapistsRouter);
 
 const evaluationsRouter = Router();
 evaluationsRouter.post("/", authenticate, protect, evaluationsController.createEvaluation);

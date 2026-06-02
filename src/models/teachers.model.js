@@ -28,8 +28,13 @@ const teacherSchema = new mongoose.Schema(
       default: null,
       index: true,
     },
+    organizationAdminId: {
+      type: Number,
+      default: null,
+      index: true,
+    },
 
-    // TODO: add more teacher-specific fields here (phone, subject, etc.)
+    // TODO: add more therapist-specific fields here (phone, specialization, etc.)
   },
   { timestamps: true }
 );
