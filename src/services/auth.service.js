@@ -14,6 +14,8 @@ import {
   verifyRefreshToken,
 } from "../utils/jwt.js";
 import { sendEmail } from "../utils/sendEmail.js";
+import { generateSessionId } from "../utils/session.js";
+
 
 const generateRandomPassword = (length = 8) => {
   const chars =
@@ -408,9 +410,57 @@ export const registerUser = async (userData) => {
   }
 };
 
+// export const loginUser = async (email, password) => {
+//   // Find user and include password
+//   const user = await User.findOne({ email }).select("+password");
+
+//   if (!user) {
+//     const error = new Error("Invalid email or password");
+//     error.statusCode = 401;
+//     throw error;
+//   }
+
+//   //  CHECK STATUS FIRST
+//   if (user.status !== 1) {
+//     const error = new Error("Your account is inactive. Please contact admin.");
+//     error.statusCode = 403;
+//     throw error;
+//   }
+
+//   // Compare password
+//   const isPasswordValid = await user.comparePassword(password);
+
+//   if (!isPasswordValid) {
+//     const error = new Error("Invalid email or password");
+//     error.statusCode = 401;
+//     throw error;
+//   }
+
+//   const token = generateAccessToken(user._id.toString());
+//   const refreshToken = await createRefreshTokenRecord(user._id.toString(), user._id);
+
+//   // Remove password
+//   const userObject = user.toObject();
+//   delete userObject.password;
+
+//   return { user: userObject, token, accessToken: token, refreshToken };
+// };
+
+
 export const loginUser = async (email, password) => {
-  // Find user and include password
-  const user = await User.findOne({ email }).select("+password");
+  if (!email || !password) {
+    const error = new Error("Email and password are required");
+    error.statusCode = 400;
+    throw error;
+  }
+
+  const normalizedEmail = email.toLowerCase().trim();
+  const cleanPassword = password.trim();
+
+  // Get user with password
+  const user = await User.findOne({
+    email: normalizedEmail,
+  }).select("+password");
 
   if (!user) {
     const error = new Error("Invalid email or password");
@@ -418,30 +468,47 @@ export const loginUser = async (email, password) => {
     throw error;
   }
 
-  //  CHECK STATUS FIRST
+  // Check user status
   if (user.status !== 1) {
-    const error = new Error("Your account is inactive. Please contact admin.");
+    const error = new Error(
+      "Your account is inactive. Please contact admin."
+    );
     error.statusCode = 403;
     throw error;
   }
 
   // Compare password
-  const isPasswordValid = await user.comparePassword(password);
+  const isMatch = await user.comparePassword(cleanPassword);
 
-  if (!isPasswordValid) {
+  if (!isMatch) {
     const error = new Error("Invalid email or password");
     error.statusCode = 401;
     throw error;
   }
 
-  const token = generateAccessToken(user._id.toString());
-  const refreshToken = await createRefreshTokenRecord(user._id.toString(), user._id);
+  // Generate JWT Access Token
+  const accessToken = generateAccessToken(user._id.toString());
 
-  // Remove password
+  // Generate Refresh Token & store in DB
+  const refreshToken = await createRefreshTokenRecord(
+    user._id.toString(),
+    user._id
+  );
+
+  // Update last login time (optional)
+  user.lastLoginAt = new Date();
+  await user.save();
+
+  // Remove password before returning
   const userObject = user.toObject();
   delete userObject.password;
 
-  return { user: userObject, token, accessToken: token, refreshToken };
+  return {
+    user: userObject,
+    token: accessToken,
+    accessToken,
+    refreshToken,
+  };
 };
 
 export const getUserById = async (userId) => {
@@ -533,69 +600,154 @@ export const getAllUsersService = async () => {
 
 
 
-export const refreshAuthToken = async (refreshToken) => {
-  if (!refreshToken) {
-    const error = new Error("Refresh token not provided");
-    error.statusCode = 400;
-    throw error;
+// export const refreshAuthToken = async (refreshToken) => {
+//   if (!refreshToken) {
+//     const error = new Error("Refresh token not provided");
+//     error.statusCode = 400;
+//     throw error;
+//   }
+
+//   const decoded = verifyRefreshToken(refreshToken);
+
+//   const storedToken = await RefreshToken.findOne({
+//     token: refreshToken,
+//     revokedAt: null,
+//   });
+
+//   if (!storedToken || storedToken.expiresAt <= new Date()) {
+//     const error = new Error("Refresh token is invalid or expired");
+//     error.statusCode = 401;
+//     throw error;
+//   }
+
+//   const user = await User.findById(decoded.userId).select("-password");
+
+//   if (!user || user.status !== 1) {
+//     const error = new Error("User not found or inactive");
+//     error.statusCode = 401;
+//     throw error;
+//   }
+
+//   storedToken.revokedAt = new Date();
+//   await storedToken.save();
+
+//   const token = generateAccessToken(user._id.toString());
+//   const newRefreshToken = await createRefreshTokenRecord(user._id.toString(), user._id);
+
+//   return {
+//     user,
+//     token,
+//     accessToken: token,
+//     refreshToken: newRefreshToken,
+//   };
+// };
+
+export const refreshAuthToken = async (userId, sessionId) => {
+  const user = await User.findById(userId);
+
+  if (!user) {
+    throw new Error("User not found");
   }
 
-  const decoded = verifyRefreshToken(refreshToken);
+  const session = user.sessions.find((s) => s.sessionId === sessionId);
 
-  const storedToken = await RefreshToken.findOne({
-    token: refreshToken,
-    revokedAt: null,
-  });
-
-  if (!storedToken || storedToken.expiresAt <= new Date()) {
-    const error = new Error("Refresh token is invalid or expired");
-    error.statusCode = 401;
-    throw error;
+  if (!session) {
+    throw new Error("Invalid session");
   }
 
-  const user = await User.findById(decoded.userId).select("-password");
-
-  if (!user || user.status !== 1) {
-    const error = new Error("User not found or inactive");
-    error.statusCode = 401;
-    throw error;
+  // Check if refresh token is expired
+  if (new Date() > session.expiresAt) {
+    user.sessions = user.sessions.filter((s) => s.sessionId !== sessionId);
+    await user.save();
+    throw new Error("Refresh token expired. Please login again.");
   }
 
-  storedToken.revokedAt = new Date();
-  await storedToken.save();
-
-  const token = generateAccessToken(user._id.toString());
-  const newRefreshToken = await createRefreshTokenRecord(user._id.toString(), user._id);
+  // Update last activity
+  session.lastActivityAt = new Date();
+  await user.save();
 
   return {
     user,
-    token,
-    accessToken: token,
-    refreshToken: newRefreshToken,
+    sessionId,
+    accessTokenExpiry: 3600, // 1 hour
   };
 };
 
-export const logoutUser = async (token, refreshToken) => {
+export const verifyRefreshTokenService = async (userId, sessionId, token) => {
+  const user = await User.findById(userId);
+
+  if (!user) {
+    throw new Error("User not found");
+  }
+
+  const session = user.sessions.find((s) => s.sessionId === sessionId);
+
+  if (!session) {
+    throw new Error("Invalid session");
+  }
+
+  if (!session.refreshToken || session.refreshToken !== token) {
+    throw new Error("Invalid refresh token");
+  }
+
+  return user;
+};
+
+// export const logoutUser = async (token, refreshToken) => {
+//   if (!token) {
+//     const error = new Error("Token not provided");
+//     error.statusCode = 400;
+//     throw error;
+//   }
+
+//   await BlacklistLog.create({
+//     token,
+//     expiresAt: getTokenExpiryDate(token),
+//   });
+
+//   if (refreshToken) {
+//     await RefreshToken.findOneAndUpdate(
+//       { token: refreshToken, revokedAt: null },
+//       { revokedAt: new Date() }
+//     );
+//   }
+
+//   return true;
+// };
+
+export const logoutUser = async (token, refreshToken = null) => {
   if (!token) {
     const error = new Error("Token not provided");
     error.statusCode = 400;
     throw error;
   }
 
+  // Blacklist access token
   await BlacklistLog.create({
     token,
     expiresAt: getTokenExpiryDate(token),
   });
 
+  // Revoke refresh token if provided
   if (refreshToken) {
     await RefreshToken.findOneAndUpdate(
-      { token: refreshToken, revokedAt: null },
-      { revokedAt: new Date() }
+      {
+        token: refreshToken,
+        revokedAt: null,
+      },
+      {
+        revokedAt: new Date(),
+      }
     );
   }
 
-  return true;
+  return {
+    success: true,
+    message: "Logged out successfully",
+  };
 };
+
+
 
 // export const updateUserService = async (userId, userData) => {
 //   const session = await mongoose.startSession();

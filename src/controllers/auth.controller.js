@@ -203,8 +203,9 @@ export const getAllUsers = asyncHandler(async (req, res) => {
 
 
 export const logout = asyncHandler(async (req, res) => {
-  const token = req.token; // coming from middleware
-  const { refreshToken } = req.body;
+  const token = req.token;
+
+  const refreshToken = req.body.refreshToken;
 
   await logoutUser(token, refreshToken);
 
