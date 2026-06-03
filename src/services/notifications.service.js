@@ -2,11 +2,14 @@ import Notification from "../models/notification.model.js";
 import NotificationPreference from "../models/notificationPreference.model.js";
 
 export const sendNotification = async (data) => {
+  if (!data.userId) {
+    throw new Error("userId is required for notification");
+  }
+
   return await Notification.create({
-    recipientId: data.recipientId,
+    userId: data.userId,
     title: data.title,
     message: data.message,
-    type: data.type || "system",
     read: false,
     metadata: data.metadata || {},
   });
@@ -30,10 +33,23 @@ export const markAsRead = async (id) => {
 };
 
 export const setNotificationPreference = async (recipientId, data) => {
+  // const preference = await NotificationPreference.findOneAndUpdate(
+  //   { recipientId },
+  //   { preferences: data.preferences || {} },
+  //   { new: true, upsert: true, setDefaultsOnInsert: true }
+  // );
+
   const preference = await NotificationPreference.findOneAndUpdate(
-    { recipientId },
-    { preferences: data.preferences || {} },
-    { new: true, upsert: true, setDefaultsOnInsert: true }
+    { userId: recipientId },
+    {
+      userId: recipientId,
+      preferences: data.preferences || {},
+    },
+    {
+      new: true,
+      upsert: true,
+      setDefaultsOnInsert: true,
+    }
   );
   return preference;
 };

@@ -43,6 +43,36 @@ const userSchema = new mongoose.Schema(
       default: null,
       trim: true,
     },
+    city: {
+      type: String,
+      default: null,
+      trim: true,
+    },
+    state: {
+      type: String,
+      default: null,
+      trim: true,
+    },
+    pincode: {
+      type: String,
+      default: null,
+      trim: true,
+    },
+    address: {
+      type: String,
+      default: null,
+      trim: true,
+    },
+    phone: {
+      type: String,
+      default: null,
+      trim: true,
+    },
+    country: {
+      type: String,
+      default: null,
+      trim: true,
+    },
     resetPasswordOTP: {
       type: String,
       default: null,

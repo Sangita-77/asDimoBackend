@@ -31,7 +31,9 @@ export const register = asyncHandler(async (req, res) => {
     city,
     state,
     pincode,
-    address
+    address,
+    phone,
+    country,
   } = req.body;
 
   if (!name || !email || flag === undefined || flag === null) {
@@ -110,6 +112,8 @@ export const register = asyncHandler(async (req, res) => {
     organizationId,
     organization_type,
     address,
+    phone,
+    country,
     superAdminId,
     zonalAdminId,
     adminId,

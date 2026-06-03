@@ -14,7 +14,8 @@ import {
   verifyRefreshToken,
 } from "../utils/jwt.js";
 import { sendEmail } from "../utils/sendEmail.js";
-import { generateSessionId } from "../utils/session.js";
+// import { generateSessionId } from "../utils/session.js";
+import { sendNotification } from "./notifications.service.js";
 
 
 const generateRandomPassword = (length = 8) => {
@@ -176,11 +177,24 @@ export const registerUser = async (userData) => {
               flag,
               password: generatedPassword,
               status: 1,
+              city : userData.city,
+              state : userData.state,
+              pincode : userData.pincode,
+              address : userData.address,
+              phone : userData.phone,
+              country : userData.country,
             },
           ],
           { session }
         );
         user = user[0];
+        // user = await User.findById(user._id);
+        user = await User.findById(user._id).session(session);
+        // await user.save({ session });
+        // console.log("Created user:", {
+        //   _id: user._id,
+        //   userId: user.userId,
+        // });
 
         // Create role-specific "table"
         if (flag === 0) {
@@ -211,6 +225,8 @@ export const registerUser = async (userData) => {
                 state : userData.state,
                 pincode : userData.pincode,
                 address : userData.address,
+                country : userData.country,
+                phone : userData.phone,
               },
             ],
             { session }
@@ -251,11 +267,14 @@ export const registerUser = async (userData) => {
                 zonalAdminId: user.userId,
                 userId: user.userId,
                 user: user._id,
-                superAdminId: parents.superAdmin.adminId,
+                superAdminId: userData.superAdminId,
+                // superAdminId: parents.superAdmin.adminId,
                 city : userData.city,
                 state : userData.state,
                 pincode : userData.pincode,
                 address : userData.address,
+                phone : userData.phone,
+                country : userData.country,
               },
             ],
             { session }
@@ -273,6 +292,8 @@ export const registerUser = async (userData) => {
                 state: userData.state,
                 pincode: userData.pincode,
                 address: userData.address,
+                phone: userData.phone,
+                country: userData.country,
                 status: 1,
               },
             ],
@@ -300,6 +321,12 @@ export const registerUser = async (userData) => {
           flag,
           password: generatedPassword,
           status: 1,
+          city : userData.city,
+          state : userData.state,
+          pincode : userData.pincode,
+          address : userData.address,
+          phone : userData.phone,
+          country : userData.country,
         });
 
         try {
@@ -322,6 +349,8 @@ export const registerUser = async (userData) => {
               state : userData.state,
               pincode : userData.pincode,
               address : userData.address,
+              phone : userData.phone,
+              country : userData.country,
             });
           }else if (flag === 2 || flag === 4) {
             roleDoc = await Parent.create({
@@ -349,6 +378,8 @@ export const registerUser = async (userData) => {
                   state : userData.state,
                   pincode : userData.pincode,
                   address : userData.address,
+                  phone : userData.phone,
+                  country : userData.country,
                 });
           } else if (flag === 7) {
             roleDoc = await Admin.create({
@@ -360,6 +391,8 @@ export const registerUser = async (userData) => {
               state: userData.state,
               pincode: userData.pincode,
               address: userData.address,
+              phone: userData.phone,
+              country: userData.country,
               status: 1,
             });
           } else {
@@ -378,18 +411,29 @@ export const registerUser = async (userData) => {
       session.endSession();
     }
 
-    // await sendEmail(
-    //   userData.email,
-    //   "Your Account Credentials",
-    //   `
-    //     <h2>Welcome ${userData.name}</h2>
-    //     <p>Your account has been created successfully.</p>
-    //     <p><strong>Email:</strong> ${userData.email}</p>
-    //     <p><strong>Password:</strong> ${generatedPassword}</p>
-    //     <p>Please login and change your password.</p>
-    //   `
-    // );
-  
+    await sendEmail(
+      userData.email,
+      "Your Account Credentials",
+      `
+        <h2>Welcome ${userData.name}</h2>
+        <p>Your account has been created successfully.</p>
+        <p><strong>Email:</strong> ${userData.email}</p>
+        <p><strong>Password:</strong> ${generatedPassword}</p>
+        <p>Please login and change your password.</p>
+      `
+    );
+
+    await sendNotification({
+      userId: user.userId,
+      title: "Registration Successful",
+      message: `Welcome ${user.name}! Your account has been created successfully.`,
+      metadata: {
+        userId: user.userId,
+        email: user.email,
+        flag: user.flag,
+        role: roleDoc?.constructor?.modelName || null,
+      },
+    });
 
     // Return user without password, plus the generated password separately
     const userObject = user.toObject();
