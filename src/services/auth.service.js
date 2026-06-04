@@ -610,6 +610,9 @@ export const updateProfileById = async (
     allowedUpdates.profileImg =
       profileData.profileImg;
   }
+  if (profileData.phone !== undefined) {
+    allowedUpdates.phone = profileData.phone;
+  }
 
   const user = await User.findByIdAndUpdate(
     userId,
