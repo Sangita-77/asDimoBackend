@@ -39,8 +39,8 @@ authRouter.post("/reset-password", authController.resetPassword);
 authRouter.get("/profile", authenticate, protect, authController.getProfile);
 // authRouter.put("/profile", authenticate, protect, authController.updateProfile);
 authRouter.put("/updateProfile/:id",authenticate,protect,uploadProfile.single("profileImg"),authController.updateProfile);
-
 authRouter.put("/change-password", authenticate, protect, authController.changePassword);
+authRouter.post("/getAllUsers", authenticate, protect, authController.getAllUsers);
 router.use("/auth", authRouter);
 
 const dashboardRouter = Router();

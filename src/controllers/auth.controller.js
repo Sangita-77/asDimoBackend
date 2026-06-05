@@ -196,7 +196,16 @@ export const getProfile = asyncHandler(async (req, res) => {
 
 
 export const getAllUsers = asyncHandler(async (req, res) => {
-  const users = await getAllUsersService();
+  const { flag } = req.body;
+
+  if (flag === undefined || flag === null) {
+    return res.status(400).json({
+      success: false,
+      message: "Flag is required",
+    });
+  }
+
+  const users = await getAllUsersService(Number(flag));
 
   res.status(200).json({
     success: true,

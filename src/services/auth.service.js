@@ -633,18 +633,17 @@ export const updateProfileById = async (
   return user;
 };
 
-export const getAllUsersService = async () => {
-  const users = await User.find().select("-password");
+export const getAllUsersService = async (flag) => {
+  const users = await User.find({ flag }).select("-password");
 
-  if (!users) {
-    const error = new Error("User not found");
+  if (!users || users.length === 0) {
+    const error = new Error("No users found");
     error.statusCode = 404;
     throw error;
   }
 
-  return users; 
+  return users;
 };
-
 
 
 // export const refreshAuthToken = async (refreshToken) => {
