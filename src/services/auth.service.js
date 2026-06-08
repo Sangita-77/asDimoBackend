@@ -1072,63 +1072,54 @@ export const updateUserService = async (userId, userData) => {
   }
 };
 
-export const deleteUserService = async (userId) => {
+export const deleteUsersService = async (userIds) => {
   const session = await mongoose.startSession();
 
   try {
-    let user;
-
     await session.withTransaction(async () => {
-
-      user = await User.findById(userId).session(session);
-
-      if (!user) {
-        throw new Error("User not found");
+      for (const userId of userIds) {
+        await deleteUserById(userId, session);
       }
-
-      const flag = user.flag;
-
-      if (flag === 0) {
-        await SuperAdmin.deleteOne({ userId: user.userId }).session(session);
-      }
-
-      else if (flag === 1) {
-        await OrganizationAdmin.deleteOne({ userId: user.userId }).session(session);
-      }
-
-      else if (flag === 2 || flag === 4) {
-        await Parent.deleteOne({ userId: user.userId }).session(session);
-      }
-
-      else if (flag === 3 || flag === 5) {
-        await Teacher.deleteOne({ userId: user.userId }).session(session);
-      }
-
-      else if (flag === 6) {
-        await ZonalAdmin.deleteOne({ userId: user.userId }).session(session);
-      }
-
-      else if (flag === 7) {
-        await Admin.deleteOne({ userId: user.userId }).session(session);
-      }
-
-      else {
-        throw new Error("Invalid flag");
-      }
-
-
-      await User.deleteOne({ _id: userId }).session(session);
-
     });
 
+    return {
+      success: true,
+      message:
+        userIds.length === 1
+          ? "User deleted successfully"
+          : `${userIds.length} users deleted successfully`,
+    };
+  } finally {
     session.endSession();
-
-    return { success: true, message: "User deleted successfully" };
-
-  } catch (error) {
-    session.endSession();
-    throw error;
   }
+};
+
+const deleteUserById = async (userId, session) => {
+  const user = await User.findById(userId).session(session);
+
+  if (!user) {
+    throw new Error(`User not found: ${userId}`);
+  }
+
+  const flag = user.flag;
+
+  if (flag === 0) {
+    await SuperAdmin.deleteOne({ userId: user.userId }).session(session);
+  } else if (flag === 1) {
+    await OrganizationAdmin.deleteOne({ userId: user.userId }).session(session);
+  } else if (flag === 2 || flag === 4) {
+    await Parent.deleteOne({ userId: user.userId }).session(session);
+  } else if (flag === 3 || flag === 5) {
+    await Teacher.deleteOne({ userId: user.userId }).session(session);
+  } else if (flag === 6) {
+    await ZonalAdmin.deleteOne({ userId: user.userId }).session(session);
+  } else if (flag === 7) {
+    await Admin.deleteOne({ userId: user.userId }).session(session);
+  } else {
+    throw new Error("Invalid flag");
+  }
+
+  await User.deleteOne({ _id: userId }).session(session);
 };
 
 // Generate 5-digit OTP

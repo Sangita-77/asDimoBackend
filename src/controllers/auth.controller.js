@@ -7,7 +7,7 @@ import {
   refreshAuthToken,
   updateUserService,
   updateProfileById,
-  deleteUserService,
+  deleteUsersService,
   verifyEmailAndSendOTP,
   validateOTP,
   resetPasswordWithOTP,
@@ -352,10 +352,17 @@ export const updateUser = asyncHandler(async (req, res) => {
   });
 });
 
-export const deleteUserCon = asyncHandler(async (req, res) => {
-  const userId = req.userId;
+export const deleteUsersCon = asyncHandler(async (req, res) => {
+  const { userIds } = req.body;
 
-  const result = await deleteUserService(userId);
+  if (!Array.isArray(userIds) || userIds.length === 0) {
+    return res.status(400).json({
+      success: false,
+      message: "Please provide userIds array",
+    });
+  }
+
+  const result = await deleteUsersService(userIds);
 
   res.status(200).json({
     success: true,

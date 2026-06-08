@@ -41,6 +41,7 @@ authRouter.get("/profile", authenticate, protect, authController.getProfile);
 authRouter.put("/updateProfile/:id",authenticate,protect,uploadProfile.single("profileImg"),authController.updateProfile);
 authRouter.put("/change-password", authenticate, protect, authController.changePassword);
 authRouter.post("/getAllUsers", authenticate, protect, authController.getAllUsers);
+authRouter.post("/delete",authenticate,protect,authController.deleteUsersCon);
 router.use("/auth", authRouter);
 
 const dashboardRouter = Router();
