@@ -196,7 +196,7 @@ export const getProfile = asyncHandler(async (req, res) => {
 
 
 export const getAllUsers = asyncHandler(async (req, res) => {
-  const { flag } = req.body;
+  const { flag, search, sort, sortBy, sortOrder } = req.body;
 
   if (flag === undefined || flag === null) {
     return res.status(400).json({
@@ -205,7 +205,12 @@ export const getAllUsers = asyncHandler(async (req, res) => {
     });
   }
 
-  const users = await getAllUsersService(Number(flag));
+  const users = await getAllUsersService(Number(flag), {
+    search,
+    sort,
+    sortBy,
+    sortOrder,
+  });
 
   res.status(200).json({
     success: true,

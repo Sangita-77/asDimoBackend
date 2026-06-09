@@ -25,7 +25,27 @@ const parentsSchema = new mongoose.Schema(
       default: null,
       index: true,
     },
+    organizationAdminId: {
+      type: Number,
+      default: null,
+      index: true,
+    },
+    zonalAdminId: {
+      type: Number,
+      default: null,
+      index: true,
+    },
+    adminId: {
+      type: Number,
+      default: null,
+      index: true,
+    },
     therapistId: {
+      type: Number,
+      default: null,
+      index: true,
+    },
+    teacherId: {
       type: Number,
       default: null,
       index: true,

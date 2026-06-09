@@ -128,6 +128,26 @@ const getRoleParents = async (flag, userData) => {
       throw error;
     }
     parents.therapist = therapist;
+
+    const organizationLookup = [];
+    if (therapist.organizationAdminId !== undefined && therapist.organizationAdminId !== null) {
+      organizationLookup.push({ organizationAdminId: therapist.organizationAdminId });
+    }
+    if (therapist.organizationId !== undefined && therapist.organizationId !== null) {
+      organizationLookup.push({ organizationId: therapist.organizationId });
+    }
+
+    const organizationAdmin = organizationLookup.length
+      ? await OrganizationAdmin.findOne({ $or: organizationLookup })
+      : null;
+
+    if (therapist.organizationId && !organizationAdmin) {
+      const error = new Error("Organization Admin not found for given therapistId");
+      error.statusCode = 404;
+      throw error;
+    }
+
+    parents.organizationAdmin = organizationAdmin;
   }
 
   return parents;
@@ -240,7 +260,19 @@ export const registerUser = async (userData) => {
                 userId: user.userId,
                 user: user._id,
                 organizationId: flag === 2 ? parents.therapist.organizationId : null,
+                organizationAdminId:
+                  flag === 2 ? parents.therapist.organizationAdminId : null,
+                zonalAdminId:
+                  flag === 2
+                    ? parents.therapist.zonalAdminId ??
+                      parents.organizationAdmin?.zonalAdminId
+                    : null,
+                adminId:
+                  flag === 2
+                    ? parents.therapist.adminId ?? parents.organizationAdmin?.adminId
+                    : null,
                 therapistId: flag === 2 ? parents.therapist.teacherId : null,
+                teacherId: flag === 2 ? parents.therapist.teacherId : null,
               },
             ],
             { session }
@@ -255,6 +287,8 @@ export const registerUser = async (userData) => {
                 user: user._id,
                 organizationId: flag === 3 ? parents.organizationAdmin.organizationId : null,
                 organizationAdminId: flag === 3 ? parents.organizationAdmin.organizationAdminId : null,
+                zonalAdminId: flag === 3 ? parents.organizationAdmin.zonalAdminId : null,
+                adminId: flag === 3 ? parents.organizationAdmin.adminId : null,
               },
             ],
             { session }
@@ -358,7 +392,19 @@ export const registerUser = async (userData) => {
               userId: user.userId,
               user: user._id,
               organizationId: flag === 2 ? parents.therapist.organizationId : null,
+              organizationAdminId:
+                flag === 2 ? parents.therapist.organizationAdminId : null,
+              zonalAdminId:
+                flag === 2
+                  ? parents.therapist.zonalAdminId ??
+                    parents.organizationAdmin?.zonalAdminId
+                  : null,
+              adminId:
+                flag === 2
+                  ? parents.therapist.adminId ?? parents.organizationAdmin?.adminId
+                  : null,
               therapistId: flag === 2 ? parents.therapist.teacherId : null,
+              teacherId: flag === 2 ? parents.therapist.teacherId : null,
             });
           } else if (flag === 3 || flag === 5) {
             roleDoc = await Teacher.create({
@@ -367,6 +413,8 @@ export const registerUser = async (userData) => {
               user: user._id,
               organizationId: flag === 3 ? parents.organizationAdmin.organizationId : null,
               organizationAdminId: flag === 3 ? parents.organizationAdmin.organizationAdminId : null,
+              zonalAdminId: flag === 3 ? parents.organizationAdmin.zonalAdminId : null,
+              adminId: flag === 3 ? parents.organizationAdmin.adminId : null,
             });
           } else if (flag === 6) {
             roleDoc = await ZonalAdmin.create({
@@ -555,6 +603,328 @@ export const loginUser = async (email, password) => {
   };
 };
 
+const withCount = (data) => ({
+  count: data.length,
+  data,
+});
+
+const uniqueNumbers = (values) => [
+  ...new Set(values.filter((value) => value !== undefined && value !== null)),
+];
+
+const getRelatedCount = (item, key) =>
+  item.relatedData?.[key]?.count ?? item.relatedData?.[key]?.data?.length ?? 0;
+
+const normalizeSortOptions = ({ sort, sortBy, sortOrder } = {}) => {
+  const sortText = String(sort ?? "").toLowerCase().trim();
+  const fieldText = String(sortBy ?? "").toLowerCase().trim();
+  const orderText = String(sortOrder ?? "").toLowerCase().trim();
+  const joinedSortText = [sortText, fieldText, orderText].filter(Boolean).join(" ");
+  const compactFieldText = fieldText.replace(/[^a-z0-9]/g, "");
+  const compactSortText = sortText.replace(/[^a-z0-9]/g, "");
+
+  let field = "name";
+  if (["admin", "admins", "admincount", "adminscount"].includes(compactFieldText)) {
+    field = "admin";
+  } else if (
+    [
+      "organization",
+      "organizations",
+      "organisation",
+      "organisations",
+      "org",
+      "orgs",
+      "organizationcount",
+      "organizationscount",
+      "organisationcount",
+      "organisationscount",
+      "orgcount",
+      "orgscount",
+    ].includes(compactFieldText)
+  ) {
+    field = "organizations";
+  } else if (["name", "username"].includes(fieldText)) {
+    field = "name";
+  } else if (
+    compactSortText.includes("organization") ||
+    compactSortText.includes("organisation") ||
+    compactSortText.includes("orgcount")
+  ) {
+    field = "organizations";
+  } else if (compactSortText.includes("admin")) {
+    field = "admin";
+  } else if (compactSortText.includes("name")) {
+    field = "name";
+  }
+
+  let direction = orderText || sortText;
+  if (
+    joinedSortText.includes("z-a") ||
+    joinedSortText.includes("za") ||
+    joinedSortText.includes("desc") ||
+    joinedSortText.includes("max-min") ||
+    joinedSortText.includes("max to min")
+  ) {
+    direction = "desc";
+  } else if (
+    joinedSortText.includes("a-z") ||
+    joinedSortText.includes("az") ||
+    joinedSortText.includes("asc") ||
+    joinedSortText.includes("min-max") ||
+    joinedSortText.includes("min to max")
+  ) {
+    direction = "asc";
+  }
+
+  return {
+    field,
+    direction: direction === "desc" ? "desc" : "asc",
+  };
+};
+
+const getSortableValue = (item, field) => {
+  if (field === "admin") {
+    return getRelatedCount(item, "admins");
+  }
+
+  if (field === "organizations") {
+    return getRelatedCount(item, "organizations");
+  }
+
+  return String(item.name ?? "").toLowerCase();
+};
+
+const searchableText = (item) =>
+  [
+    item.name,
+    item.email,
+    item.userId,
+    item.phone,
+    item.city,
+    item.state,
+    item.country,
+    item.roleData?.city,
+    item.roleData?.state,
+    item.roleData?.country,
+  ]
+    .filter((value) => value !== undefined && value !== null)
+    .join(" ")
+    .toLowerCase();
+
+const applySearchAndSort = (users, options = {}) => {
+  const search = String(options.search ?? "").trim().toLowerCase();
+  const filteredUsers = search
+    ? users.filter((user) => searchableText(user).includes(search))
+    : users;
+
+  if (!options.sort && !options.sortBy && !options.sortOrder) {
+    return filteredUsers;
+  }
+
+  const { field, direction } = normalizeSortOptions(options);
+  const multiplier = direction === "desc" ? -1 : 1;
+
+  return [...filteredUsers].sort((first, second) => {
+    const firstValue = getSortableValue(first, field);
+    const secondValue = getSortableValue(second, field);
+
+    if (typeof firstValue === "number" && typeof secondValue === "number") {
+      return (firstValue - secondValue) * multiplier;
+    }
+
+    return String(firstValue).localeCompare(String(secondValue)) * multiplier;
+  });
+};
+
+const getRelatedRoleData = async (user, roleData) => {
+  if (!roleData || Object.keys(roleData).length === 0) {
+    return null;
+  }
+
+  if (user.flag === 6) {
+    const admins = await Admin.find({
+      zonalAdminId: roleData.zonalAdminId,
+    }).lean();
+    const adminIds = uniqueNumbers(admins.map((admin) => admin.adminId));
+
+    const organizations = await OrganizationAdmin.find({
+      zonalAdminId: roleData.zonalAdminId,
+      ...(adminIds.length ? { adminId: { $in: adminIds } } : {}),
+    }).lean();
+
+    const organizationIds = uniqueNumbers(
+      organizations.map((org) => org.organizationId)
+    );
+    const organizationAdminIds = uniqueNumbers(
+      organizations.map((org) => org.organizationAdminId)
+    );
+
+    const teachers = organizationIds.length
+      ? await Teacher.find({
+          $or: [
+            {
+              zonalAdminId: roleData.zonalAdminId,
+              adminId: { $in: adminIds },
+              organizationId: { $in: organizationIds },
+            },
+            {
+              organizationId: { $in: organizationIds },
+              organizationAdminId: { $in: organizationAdminIds },
+            },
+          ],
+        }).lean()
+      : [];
+
+    const teacherIds = uniqueNumbers(teachers.map((teacher) => teacher.teacherId));
+    const parents =
+      organizationIds.length && teacherIds.length
+        ? await Parent.find({
+            $or: [
+              {
+                zonalAdminId: roleData.zonalAdminId,
+                adminId: { $in: adminIds },
+                organizationId: { $in: organizationIds },
+                teacherId: { $in: teacherIds },
+              },
+              {
+                organizationId: { $in: organizationIds },
+                therapistId: { $in: teacherIds },
+              },
+            ],
+          }).lean()
+        : [];
+
+    return {
+      admins: withCount(admins),
+      organizations: withCount(organizations),
+      teachers: withCount(teachers),
+      parents: withCount(parents),
+    };
+  }
+
+  if (user.flag === 7) {
+    const organizations = await OrganizationAdmin.find({
+      zonalAdminId: roleData.zonalAdminId,
+      adminId: roleData.adminId,
+    }).lean();
+
+    const organizationIds = uniqueNumbers(
+      organizations.map((org) => org.organizationId)
+    );
+    const organizationAdminIds = uniqueNumbers(
+      organizations.map((org) => org.organizationAdminId)
+    );
+
+    const teachers = organizationIds.length
+      ? await Teacher.find({
+          $or: [
+            {
+              zonalAdminId: roleData.zonalAdminId,
+              adminId: roleData.adminId,
+              organizationId: { $in: organizationIds },
+            },
+            {
+              organizationId: { $in: organizationIds },
+              organizationAdminId: { $in: organizationAdminIds },
+            },
+          ],
+        }).lean()
+      : [];
+
+    const teacherIds = uniqueNumbers(teachers.map((teacher) => teacher.teacherId));
+    const parents =
+      organizationIds.length && teacherIds.length
+        ? await Parent.find({
+            $or: [
+              {
+                zonalAdminId: roleData.zonalAdminId,
+                adminId: roleData.adminId,
+                organizationId: { $in: organizationIds },
+                teacherId: { $in: teacherIds },
+              },
+              {
+                organizationId: { $in: organizationIds },
+                therapistId: { $in: teacherIds },
+              },
+            ],
+          }).lean()
+        : [];
+
+    return {
+      organizations: withCount(organizations),
+      teachers: withCount(teachers),
+      parents: withCount(parents),
+    };
+  }
+
+  if (user.flag === 1) {
+    const teachers = await Teacher.find({
+      $or: [
+        {
+          zonalAdminId: roleData.zonalAdminId,
+          adminId: roleData.adminId,
+          organizationId: roleData.organizationId,
+        },
+        {
+          organizationId: roleData.organizationId,
+          organizationAdminId: roleData.organizationAdminId,
+        },
+      ],
+    }).lean();
+
+    const teacherIds = uniqueNumbers(teachers.map((teacher) => teacher.teacherId));
+    const parents = teacherIds.length
+      ? await Parent.find({
+          $or: [
+            {
+              zonalAdminId: roleData.zonalAdminId,
+              adminId: roleData.adminId,
+              organizationId: roleData.organizationId,
+              teacherId: { $in: teacherIds },
+            },
+            {
+              organizationId: roleData.organizationId,
+              therapistId: { $in: teacherIds },
+            },
+          ],
+        }).lean()
+      : [];
+
+    return {
+      teachers: withCount(teachers),
+      parents: withCount(parents),
+    };
+  }
+
+  if (user.flag === 3) {
+    const parentFilters = [
+      {
+        organizationId: roleData.organizationId,
+        therapistId: roleData.teacherId,
+      },
+    ];
+
+    if (roleData.zonalAdminId !== undefined && roleData.zonalAdminId !== null) {
+      parentFilters.push({
+        zonalAdminId: roleData.zonalAdminId,
+        adminId: roleData.adminId,
+        organizationId: roleData.organizationId,
+        teacherId: roleData.teacherId,
+      });
+    }
+
+    const parents = await Parent.find({
+      $or: parentFilters,
+    }).lean();
+
+    return {
+      parents: withCount(parents),
+    };
+  }
+
+  return null;
+};
+
 export const getUserById = async (userId) => {
   const user = await User.findById(userId).select("-password");
 
@@ -585,9 +955,12 @@ export const getUserById = async (userId) => {
     roleData = await Admin.findOne({ userId: user.userId });
   } 
 
+  const relatedData = await getRelatedRoleData(user, roleData);
+
   return {
     user,
-    roleData
+    roleData,
+    relatedData,
   };
 };
 
@@ -633,8 +1006,21 @@ export const updateProfileById = async (
   return user;
 };
 
-export const getAllUsersService = async (flag) => {
-  const users = await User.find({ flag }).select("-password");
+// export const getAllUsersService = async (flag) => {
+//   const users = await User.find({ flag }).select("-password");
+
+//   if (!users || users.length === 0) {
+//     const error = new Error("No users found");
+//     error.statusCode = 404;
+//     throw error;
+//   }
+
+//   return users;
+// };
+
+
+export const getAllUsersService = async (flag, options = {}) => {
+  const users = await User.find({ flag }).select("-password").lean();
 
   if (!users || users.length === 0) {
     const error = new Error("No users found");
@@ -642,9 +1028,64 @@ export const getAllUsersService = async (flag) => {
     throw error;
   }
 
-  return users;
-};
+  const enrichedUsers = await Promise.all(
+    users.map(async (user) => {
+      let roleData = null;
 
+      switch (user.flag) {
+        case 1:
+          roleData =
+            await OrganizationAdmin.findOne({
+              userId: user.userId,
+            }).lean();
+          break;
+
+        case 2:
+        case 4:
+          roleData =
+            await Parent.findOne({
+              userId: user.userId,
+            }).lean();
+          break;
+
+        case 3:
+        case 5:
+          roleData =
+            await Teacher.findOne({
+              userId: user.userId,
+            }).lean();
+          break;
+
+        case 6:
+          roleData =
+            await ZonalAdmin.findOne({
+              userId: user.userId,
+            }).lean();
+          break;
+
+        case 7:
+          roleData =
+            await Admin.findOne({
+              userId: user.userId,
+            }).lean();
+          break;
+
+        default:
+          roleData = null;
+      }
+
+      const relatedData = await getRelatedRoleData(user, roleData);
+
+      return {
+        ...user,
+        roleData,
+        relatedData,
+      };
+    })
+  );
+
+  return applySearchAndSort(enrichedUsers, options);
+};
 
 // export const refreshAuthToken = async (refreshToken) => {
 //   if (!refreshToken) {
@@ -990,7 +1431,19 @@ export const updateUserService = async (userId, userData) => {
           { userId: user.userId },
           {
             organizationId: flag === 2 ? parents.therapist.organizationId : null,
+            organizationAdminId:
+              flag === 2 ? parents.therapist.organizationAdminId : null,
+            zonalAdminId:
+              flag === 2
+                ? parents.therapist.zonalAdminId ??
+                  parents.organizationAdmin?.zonalAdminId
+                : null,
+            adminId:
+              flag === 2
+                ? parents.therapist.adminId ?? parents.organizationAdmin?.adminId
+                : null,
             therapistId: flag === 2 ? parents.therapist.teacherId : null,
+            teacherId: flag === 2 ? parents.therapist.teacherId : null,
           },
           {
             returnDocument: "after",
@@ -1005,6 +1458,8 @@ export const updateUserService = async (userId, userData) => {
           {
             organizationId: flag === 3 ? parents.organizationAdmin.organizationId : null,
             organizationAdminId: flag === 3 ? parents.organizationAdmin.organizationAdminId : null,
+            zonalAdminId: flag === 3 ? parents.organizationAdmin.zonalAdminId : null,
+            adminId: flag === 3 ? parents.organizationAdmin.adminId : null,
           },
           {
             returnDocument: "after",

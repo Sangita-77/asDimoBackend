@@ -33,6 +33,16 @@ const teacherSchema = new mongoose.Schema(
       default: null,
       index: true,
     },
+    zonalAdminId: {
+      type: Number,
+      default: null,
+      index: true,
+    },
+    adminId: {
+      type: Number,
+      default: null,
+      index: true,
+    },
 
     // TODO: add more therapist-specific fields here (phone, specialization, etc.)
   },
