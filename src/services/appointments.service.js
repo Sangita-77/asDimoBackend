@@ -3,6 +3,11 @@ import Availability from "../models/avialability.model.js";
 import User from "../models/user.model.js";
 import { sendEmail } from "../utils/sendEmail.js";
 import { sendNotification } from "./notifications.service.js";
+import Parent from "../models/parents.model.js";
+import Teacher from "../models/teachers.model.js";
+import OrganizationAdmin from "../models/organizationAdmin.model.js";
+import ZonalAdmin from "../models/zonalAdmin.model.js";
+import Admin from "../models/admin.model.js";
 
 export const createAppointment = async (data) => {
   const availability = await Availability.findOne({
@@ -120,7 +125,47 @@ export const createAppointment = async (data) => {
 };
 
 export const getAppointments = async () => {
-  return await Appointment.find();
+  const appointments = await Appointment.find().lean();
+
+  const enrichedAppointments = await Promise.all(
+    appointments.map(async (appointment) => {
+      const [teacher, parent] = await Promise.all([
+        Teacher.findOne({ userId: appointment.teacherId }).lean(),
+        Parent.findOne({ userId: appointment.parentId }).lean(),
+      ]);
+
+      let organization = null;
+      let zonalAdmin = null;
+      let admin = null;
+
+      if (parent) {
+        [organization, zonalAdmin, admin] = await Promise.all([
+          User.findOne({ userId: parent.organizationId })
+            .select("-password")
+            .lean(),
+
+          User.findOne({ userId: parent.zonalAdminId })
+            .select("-password")
+            .lean(),
+
+          User.findOne({ userId: parent.adminId })
+            .select("-password")
+            .lean(),
+        ]);
+      }
+
+      return {
+        ...appointment,
+        teacher,
+        parent,
+        organization,
+        zonalAdmin,
+        admin,
+      };
+    })
+  );
+
+  return enrichedAppointments;
 };
 
 export const getAppointmentById = async (id) => {
