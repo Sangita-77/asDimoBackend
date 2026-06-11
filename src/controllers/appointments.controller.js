@@ -2,6 +2,14 @@ import { asyncHandler } from "../utils/asyncHandler.js";
 import * as appointmentsService from "../services/appointments.service.js";
 
 export const createAppointment = asyncHandler(async (req, res) => {
+    const {teacherId , date , time , parentId } = req.body;
+
+  if (!teacherId || !date || !time || !parentId) {
+    return res.status(400).json({
+      success: false,
+      message: "Please provide all required fields: teacherId, date, time, parentId",
+    });
+  }
   const appointment = await appointmentsService.createAppointment(req.body);
   res.status(201).json({
     success: true,
@@ -38,6 +46,14 @@ export const confirmAppointment = asyncHandler(async (req, res) => {
 });
 
 export const rescheduleAppointment = asyncHandler(async (req, res) => {
+  const {date , time } = req.body;
+
+  if (!date || !time) {
+    return res.status(400).json({
+      success: false,
+      message: "Please provide all required fields: date, time",
+    });
+  }
   const appointment = await appointmentsService.rescheduleAppointment(req.params.id, req.body);
   res.status(200).json({
     success: true,
@@ -56,7 +72,7 @@ export const cancelAppointment = asyncHandler(async (req, res) => {
 });
 
 export const completeAppointment = asyncHandler(async (req, res) => {
-  const appointment = await appointmentsService.completeAppointment(req.params.id, req.body);
+  const appointment = await appointmentsService.completeAppointment(req.params.id);
   res.status(200).json({
     success: true,
     message: "Appointment completed successfully",

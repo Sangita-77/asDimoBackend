@@ -44,6 +44,24 @@ authRouter.post("/getAllUsers", authenticate, protect, authController.getAllUser
 authRouter.post("/delete",authenticate,protect,authController.deleteUsersCon);
 router.use("/auth", authRouter);
 
+const therapistsRouter = Router();
+therapistsRouter.post("/availability", authenticate, protect, teacherController.addAvailabilityCon);
+therapistsRouter.get("/availability", authenticate, protect, teacherController.getAvailabilityWTCon);
+therapistsRouter.patch("/appointments/status", authenticate, protect, teacherController.approveAppointmentCon);
+router.use("/therapists", therapistsRouter);
+
+const appointmentsRouter = Router();
+appointmentsRouter.post("/", authenticate, protect, appointmentsController.createAppointment);
+appointmentsRouter.get("/", authenticate, protect, appointmentsController.getAppointments);
+appointmentsRouter.get("/:id", authenticate, protect, appointmentsController.getAppointmentById);
+appointmentsRouter.patch("/confirm/:id", authenticate, protect, appointmentsController.confirmAppointment);
+appointmentsRouter.patch("/reschedule/:id", authenticate, protect, appointmentsController.rescheduleAppointment);
+appointmentsRouter.patch("/cancel/:id", authenticate, protect, appointmentsController.cancelAppointment);
+appointmentsRouter.patch("/complete/:id", authenticate, protect, appointmentsController.completeAppointment);
+appointmentsRouter.get("/available-slots/:doctorId", authenticate, protect, appointmentsController.getAvailableSlots);
+router.use("/appointments", appointmentsRouter);
+
+
 const dashboardRouter = Router();
 dashboardRouter.get("/super-admin", authenticate, protect, dashboardController.getSuperAdminDashboard);
 dashboardRouter.get("/organization-admin", authenticate, protect, dashboardController.getOrganizationAdminDashboard);
@@ -96,11 +114,7 @@ doctorsRouter.patch("/availability/:id", authenticate, protect, doctorsControlle
 doctorsRouter.patch("/assign-organization/:id", authenticate, protect, doctorsController.assignDoctorOrganization);
 router.use("/doctors", doctorsRouter);
 
-const therapistsRouter = Router();
-therapistsRouter.post("/availability", authenticate, protect, teacherController.addAvailabilityCon);
-therapistsRouter.get("/availability", authenticate, protect, teacherController.getAvailabilityWTCon);
-therapistsRouter.patch("/appointments/status", authenticate, protect, teacherController.approveAppointmentCon);
-router.use("/therapists", therapistsRouter);
+
 
 const evaluationsRouter = Router();
 evaluationsRouter.post("/", authenticate, protect, evaluationsController.createEvaluation);
@@ -123,16 +137,7 @@ questionsRouter.post("/options", authenticate, protect, questionsController.crea
 questionsRouter.post("/recommendations", authenticate, protect, questionsController.createRecommendation);
 router.use("/questions", questionsRouter);
 
-const appointmentsRouter = Router();
-appointmentsRouter.post("/", authenticate, protect, appointmentsController.createAppointment);
-appointmentsRouter.get("/", authenticate, protect, appointmentsController.getAppointments);
-appointmentsRouter.get("/:id", authenticate, protect, appointmentsController.getAppointmentById);
-appointmentsRouter.patch("/confirm/:id", authenticate, protect, appointmentsController.confirmAppointment);
-appointmentsRouter.patch("/reschedule/:id", authenticate, protect, appointmentsController.rescheduleAppointment);
-appointmentsRouter.patch("/cancel/:id", authenticate, protect, appointmentsController.cancelAppointment);
-appointmentsRouter.patch("/complete/:id", authenticate, protect, appointmentsController.completeAppointment);
-appointmentsRouter.get("/available-slots/:doctorId", authenticate, protect, appointmentsController.getAvailableSlots);
-router.use("/appointments", appointmentsRouter);
+
 
 const gamesRouter = Router();
 gamesRouter.post("/", authenticate, protect, gamesController.createGame);
