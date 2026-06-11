@@ -18,8 +18,24 @@ export const createAppointment = asyncHandler(async (req, res) => {
   });
 });
 
+// export const getAppointments = asyncHandler(async (req, res) => {
+//   const appointments = await appointmentsService.getAppointments();
+//   res.status(200).json({
+//     success: true,
+//     message: "Appointments retrieved successfully",
+//     data: appointments,
+//   });
+// });
+
 export const getAppointments = asyncHandler(async (req, res) => {
-  const appointments = await appointmentsService.getAppointments();
+  const { search = "", sortBy = "", sortOrder = "asc" } = req.query;
+
+  const appointments = await appointmentsService.getAppointments({
+    search,
+    sortBy,
+    sortOrder,
+  });
+
   res.status(200).json({
     success: true,
     message: "Appointments retrieved successfully",
