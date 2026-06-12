@@ -11,6 +11,7 @@ import {
   verifyEmailAndSendOTP,
   validateOTP,
   resetPasswordWithOTP,
+  getAllUsersServiceById,
 } from "../services/auth.service.js";
 import { asyncHandler } from "../utils/asyncHandler.js";
 
@@ -462,5 +463,25 @@ export const changePassword = asyncHandler(async (req, res) => {
   res.status(200).json({
     success: true,
     message: "Password changed successfully",
+  });
+});
+
+
+export const getAllUsersById = asyncHandler(async (req, res) => {
+  const { userId } = req.body;
+
+  if (!userId) {
+    return res.status(400).json({
+      success: false,
+      message: "userId is required",
+    });
+  }
+
+  const users = await getAllUsersServiceById(userId);
+
+  res.status(200).json({
+    success: true,
+    count: users.length,
+    data: users,
   });
 });

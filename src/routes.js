@@ -42,6 +42,7 @@ authRouter.put("/updateProfile/:id",authenticate,protect,uploadProfile.single("p
 authRouter.put("/change-password", authenticate, protect, authController.changePassword);
 authRouter.post("/getAllUsers", authenticate, protect, authController.getAllUsers);
 authRouter.post("/delete",authenticate,protect,authController.deleteUsersCon);
+authRouter.post("/getAllUsersById", authenticate, protect, authController.getAllUsersById);
 router.use("/auth", authRouter);
 
 const therapistsRouter = Router();

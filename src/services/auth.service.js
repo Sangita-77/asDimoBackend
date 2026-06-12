@@ -1797,3 +1797,103 @@ export const resetPasswordWithOTP = async (email, otp, newPassword) => {
 
   return { success: true, message: "Password updated successfully" };
 };
+
+const enrichWithUserData = async (items = []) => {
+  return Promise.all(
+    items.map(async (item) => {
+      const userData = await User.findOne({
+        userId: item.userId,
+      })
+        .select("-password")
+        .lean();
+
+      return {
+        ...item,
+        userData,
+      };
+    })
+  );
+};
+
+export const getAllUsersServiceById = async (userId) => {
+  const user = await User.findOne({ userId })
+    .select("-password")
+    .lean();
+
+  if (!user) {
+    const error = new Error("User not found");
+    error.statusCode = 404;
+    throw error;
+  }
+
+  let roleData = null;
+
+  switch (user.flag) {
+    case 1:
+      roleData = await OrganizationAdmin.findOne({
+        userId: user.userId,
+      }).lean();
+      break;
+
+    case 2:
+    case 4:
+      roleData = await Parent.findOne({
+        userId: user.userId,
+      }).lean();
+      break;
+
+    case 3:
+    case 5:
+      roleData = await Teacher.findOne({
+        userId: user.userId,
+      }).lean();
+      break;
+
+    case 6:
+      roleData = await ZonalAdmin.findOne({
+        userId: user.userId,
+      }).lean();
+      break;
+
+    case 7:
+      roleData = await Admin.findOne({
+        userId: user.userId,
+      }).lean();
+      break;
+
+    default:
+      roleData = null;
+  }
+
+  const relatedData = await getRelatedRoleData(user, roleData);
+
+  if (relatedData?.admins?.data) {
+    relatedData.admins.data = await enrichWithUserData(
+      relatedData.admins.data
+    );
+  }
+
+  if (relatedData?.organizations?.data) {
+    relatedData.organizations.data = await enrichWithUserData(
+      relatedData.organizations.data
+    );
+  }
+
+  if (relatedData?.teachers?.data) {
+    relatedData.teachers.data = await enrichWithUserData(
+      relatedData.teachers.data
+    );
+  }
+
+  if (relatedData?.parents?.data) {
+    relatedData.parents.data = await enrichWithUserData(
+      relatedData.parents.data
+    );
+  }
+
+  return {
+    ...user,
+    roleData,
+    relatedData,
+  };
+};
