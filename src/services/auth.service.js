@@ -1092,6 +1092,21 @@ export const updateProfileById = async (
   if (profileData.phone !== undefined) {
     allowedUpdates.phone = profileData.phone;
   }
+  if (profileData.city !== undefined) {
+    allowedUpdates.city = profileData.city;
+  }
+  if (profileData.state !== undefined) {
+    allowedUpdates.state = profileData.state;
+  }
+  if (profileData.pincode !== undefined) {
+    allowedUpdates.pincode = profileData.pincode;
+  }
+  if (profileData.address !== undefined) {
+    allowedUpdates.address = profileData.address;
+  }
+  if (profileData.country !== undefined) {
+    allowedUpdates.country = profileData.country;
+  }
 
   const user = await User.findByIdAndUpdate(
     userId,

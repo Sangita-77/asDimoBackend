@@ -433,7 +433,31 @@ export const validateEmailOTP = asyncHandler(async (req, res) => {
   });
 });
 
+// export const updateProfile = asyncHandler(async (req, res) => {
+
+//   const profileData = {
+//     ...req.body,
+//     profileImg: req.file
+//       ? `/uploads/profile/${req.file.filename}`
+//       : req.body.profileImg,
+//   };
+
+//   const updatedProfile = await updateProfileById(
+//     req.user._id,
+//     profileData
+//   );
+
+//   res.status(200).json({
+//     success: true,
+//     message: "Profile updated successfully",
+//     data: updatedProfile,
+//   });
+// });
+
+
 export const updateProfile = asyncHandler(async (req, res) => {
+  // console.log("PARAM ID:", req.params.id);
+  // console.log("BODY:", req.body);
 
   const profileData = {
     ...req.body,
@@ -443,9 +467,11 @@ export const updateProfile = asyncHandler(async (req, res) => {
   };
 
   const updatedProfile = await updateProfileById(
-    req.user._id,
+    req.params.id,
     profileData
   );
+
+  console.log("UPDATED:", updatedProfile);
 
   res.status(200).json({
     success: true,
