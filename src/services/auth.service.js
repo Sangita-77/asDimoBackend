@@ -588,7 +588,7 @@ export const loginUser = async (email, password) => {
   );
 
   // Update last login time (optional)
-  user.lastLoginAt = new Date();
+  user.lastLogin = new Date();
   await user.save();
 
   // Remove password before returning
