@@ -153,6 +153,19 @@ const getRoleParents = async (flag, userData) => {
   return parents;
 };
 
+const generateReferralCode = (length = 6) => {
+  const chars = "ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789";
+  let code = "";
+
+  for (let i = 0; i < length; i++) {
+    code += chars.charAt(
+      Math.floor(Math.random() * chars.length)
+    );
+  }
+
+  return code;
+};
+
 
 export const registerUser = async (userData) => {
 
@@ -164,6 +177,17 @@ export const registerUser = async (userData) => {
     error.statusCode = 400;
     throw error;
   }
+
+  let referralCode;
+  let exists;
+
+  do {
+    referralCode = generateReferralCode(6);
+
+    exists = await User.findOne({
+      referralCode,
+    });
+  } while (exists);
 
   try {
     const generatedPassword = generateRandomPassword();
@@ -196,6 +220,7 @@ export const registerUser = async (userData) => {
               email: userData.email,
               flag,
               password: generatedPassword,
+              referralCode,
               status: 1,
               city : userData.city,
               state : userData.state,
