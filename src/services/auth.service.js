@@ -203,6 +203,7 @@ export const registerUser = async (userData) => {
               address : userData.address,
               phone : userData.phone,
               country : userData.country,
+              profileImg: userData.profileImg,
             },
           ],
           { session }

@@ -28,7 +28,15 @@ const router = Router();
 router.use(auditLogger);
 
 const authRouter = Router();
-authRouter.post("/register", authController.register);
+// authRouter.post("/register", authController.register);
+// authRouter.post("/register",uploadProfile.single("profileImg"),authController.register);
+authRouter.post(
+  "/register",
+  authenticate,
+  protect,
+  uploadProfile.single("profileImg"),
+  authController.register
+);
 authRouter.post("/login", authController.login);
 authRouter.post("/refresh-token", authController.refreshToken);
 authRouter.post("/logout", authenticate, protect, authController.logout);

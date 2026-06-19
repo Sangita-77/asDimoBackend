@@ -37,6 +37,13 @@ export const register = asyncHandler(async (req, res) => {
     country,
   } = req.body;
 
+  // console.log("BODY =>", req.body);
+  // console.log("FILE =>", req.file);
+
+  const profileImg = req.file
+  ? `/uploads/profile/${req.file.filename}`
+  : null;
+
   if (!name || !email || flag === undefined || flag === null) {
     return res.status(400).json({
       success: false,
@@ -123,7 +130,8 @@ export const register = asyncHandler(async (req, res) => {
     teacherId,
     city,
     state,
-    pincode
+    pincode,
+    profileImg,
   });
 
   res.status(201).json({
