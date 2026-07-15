@@ -57,6 +57,7 @@ router.use("/auth", authRouter);
 const therapistsRouter = Router();
 therapistsRouter.post("/availability", authenticate, protect, teacherController.addAvailabilityCon);
 therapistsRouter.get("/availability", authenticate, protect, teacherController.getAvailabilityWTCon);
+therapistsRouter.post("/get_availability", authenticate, protect, teacherController.getAvilabilitySlotsOfTherapist);
 therapistsRouter.patch("/appointments/status", authenticate, protect, teacherController.approveAppointmentCon);
 router.use("/therapists", therapistsRouter);
 

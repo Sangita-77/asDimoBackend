@@ -2,6 +2,7 @@ import {
   addAvailabilityservice,
   getAvailabilityWTSer,
   approveAppointmentSer,
+  getAvailabilitySlotsService,
   } from "../services/teacher.service.js";
   import { asyncHandler } from "../utils/asyncHandler.js";
 
@@ -52,5 +53,16 @@ export const approveAppointmentCon = asyncHandler(async (req, res) => {
     success: true,
     message: `Appointment ${status} successfully`,
     data,
+  });
+});
+
+export const getAvilabilitySlotsOfTherapist = asyncHandler(async (req, res) => {
+  const { therapistId } = req.body;
+  const availabilitySlots = await getAvailabilitySlotsService(therapistId);
+
+  res.status(200).json({
+    success: true,
+    message: "Availability slots retrieved successfully",
+    data: availabilitySlots,
   });
 });
