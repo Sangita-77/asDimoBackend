@@ -12,8 +12,14 @@ import {
   validateOTP,
   resetPasswordWithOTP,
   getAllUsersServiceById,
+  getAllUsersByRelationService,
 } from "../services/auth.service.js";
+import {
+  sendEmailOtp,
+  validateEmailOtp,
+} from "../services/emailOtp.service.js";
 import { asyncHandler } from "../utils/asyncHandler.js";
+import OrganizationAdmin from "../models/organizationAdmin.model.js";
 
 
 export const register = asyncHandler(async (req, res) => {
@@ -21,6 +27,7 @@ export const register = asyncHandler(async (req, res) => {
     name,
     email,
     flag,
+    referralCode,
     organizationId,
     organization_type,
     superAdminId,
@@ -35,6 +42,7 @@ export const register = asyncHandler(async (req, res) => {
     address,
     phone,
     country,
+    org_name,
   } = req.body;
 
   // console.log("BODY =>", req.body);
@@ -97,10 +105,15 @@ export const register = asyncHandler(async (req, res) => {
     });
   }
 
-  if (numericFlag === 2 && !therapistId && !teacherId) {
+  if (
+    numericFlag === 2 &&
+    !therapistId &&
+    !teacherId &&
+    !referralCode
+  ) {
     return res.status(400).json({
       success: false,
-      message: "therapistId is required for Parent",
+      message: "therapistId or referralCode is required for Parent",
     });
   }
 
@@ -113,10 +126,39 @@ export const register = asyncHandler(async (req, res) => {
   //   address
   // });
 
+  let generatedOrgName = org_name;
+
+  if (numericFlag === 5) {
+    // First 3 letters of name
+    const prefix = name
+      .trim()
+      .substring(0, 3)
+      .toUpperCase();
+
+    // Find last generated org_name
+    const lastOrg = await OrganizationAdmin.findOne({
+      org_name: { $regex: `^${prefix}_` },
+    }).sort({ org_name: -1 });
+
+    let nextNumber = 1;
+
+    if (lastOrg) {
+      const lastSequence = parseInt(lastOrg.org_name.split("_")[1]) || 0;
+      nextNumber = lastSequence + 1;
+    }
+
+    generatedOrgName = `${prefix}_${String(nextNumber).padStart(3, "0")}`;
+  }
+
+  if (numericFlag === 1) {
+    generatedOrgName = name;
+  }
+
   const { user, generatedPassword, role } = await registerUser({
     name,
     email,
     flag,
+    referralCode,
     organizationId,
     organization_type,
     address,
@@ -132,6 +174,7 @@ export const register = asyncHandler(async (req, res) => {
     state,
     pincode,
     profileImg,
+    org_name: generatedOrgName,
   });
 
   res.status(201).json({
@@ -215,6 +258,37 @@ export const getAllUsers = asyncHandler(async (req, res) => {
   }
 
   const users = await getAllUsersService(Number(flag), {
+    search,
+    sort,
+    sortBy,
+    sortOrder,
+  });
+
+  res.status(200).json({
+    success: true,
+    count: users.length,
+    data: users,
+  });
+});
+
+export const getAllUsersByRelation = asyncHandler(async (req, res) => {
+  const {
+    flag,
+    userId,
+    search,
+    sort,
+    sortBy,
+    sortOrder,
+  } = req.body;
+
+  if (flag === undefined || flag === null) {
+    return res.status(400).json({
+      success: false,
+      message: "Flag is required",
+    });
+  }
+
+  const users = await getAllUsersByRelationService(Number(flag), userId, {
     search,
     sort,
     sortBy,
@@ -517,5 +591,28 @@ export const getAllUsersById = asyncHandler(async (req, res) => {
     success: true,
     count: users.length,
     data: users,
+  });
+});
+
+// OTP flow for any valid email address. It uses in-memory storage only.
+export const sendOtpToEmail = asyncHandler(async (req, res) => {
+  const { email } = req.body;
+  const result = await sendEmailOtp(email);
+
+  res.status(200).json({
+    success: true,
+    message: "OTP sent successfully",
+    data: result,
+  });
+});
+
+export const validateUnregisteredEmailOtp = asyncHandler(async (req, res) => {
+  const { email, otp } = req.body;
+  const result = validateEmailOtp(email, otp);
+
+  res.status(200).json({
+    success: true,
+    message: "OTP validated successfully",
+    data: { email: result.email, verified: true },
   });
 });

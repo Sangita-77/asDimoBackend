@@ -90,6 +90,11 @@ const userSchema = new mongoose.Schema(
       unique: true,
       index: true,
     },
+    org_name: {
+      type: String,
+      unique: false,
+      index: true,
+    },
   },
   { timestamps: true }
 );

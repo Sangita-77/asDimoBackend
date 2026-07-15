@@ -32,8 +32,6 @@ const authRouter = Router();
 // authRouter.post("/register",uploadProfile.single("profileImg"),authController.register);
 authRouter.post(
   "/register",
-  authenticate,
-  protect,
   uploadProfile.single("profileImg"),
   authController.register
 );
@@ -43,12 +41,15 @@ authRouter.post("/logout", authenticate, protect, authController.logout);
 authRouter.post("/forgot-password", authController.forgotPassword);
 authRouter.post("/verify-email", authController.verifyEmail);
 authRouter.post("/validate-otp", authController.validateEmailOTP);
+authRouter.post("/send-email-otp", authController.sendOtpToEmail);
+authRouter.post("/validate-email-otp", authController.validateUnregisteredEmailOtp);
 authRouter.post("/reset-password", authController.resetPassword);
 authRouter.get("/profile", authenticate, protect, authController.getProfile);
 // authRouter.put("/profile", authenticate, protect, authController.updateProfile);
 authRouter.put("/updateProfile/:id",authenticate,protect,uploadProfile.single("profileImg"),authController.updateProfile);
 authRouter.put("/change-password", authenticate, protect, authController.changePassword);
 authRouter.post("/getAllUsers", authenticate, protect, authController.getAllUsers);
+authRouter.post("/getAllUsersByRelation", authenticate, protect, authController.getAllUsersByRelation);
 authRouter.post("/delete",authenticate,protect,authController.deleteUsersCon);
 authRouter.post("/getAllUsersById", authenticate, protect, authController.getAllUsersById);
 router.use("/auth", authRouter);

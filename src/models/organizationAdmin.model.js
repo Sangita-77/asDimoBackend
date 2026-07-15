@@ -28,18 +28,22 @@ const organizationAdminSchema = new mongoose.Schema(
       index: true,
     },
     adminId: {
-      type: Number,
-      required: true,
-      index: true,
+        type: String,
+        required: function () {
+            return this.flag === 1;
+        },
     },
     organization_type: {
-      type: Number,
-      enum: [0, 1], // 0 = Clinic, 1 = School
-      required: true
+        type: Number,
+        required: function () {
+            return this.flag === 1;
+        },
     },
     zonalAdminId: {
-      type: Number,
-      required: true,
+        type: String,
+        required: function () {
+            return this.flag === 1;
+        },
     },
     city: {
       type: String,
