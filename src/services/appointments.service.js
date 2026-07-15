@@ -29,7 +29,8 @@ export const createAppointment = async (data) => {
     availabilityId: availability._id,
     date: data.date,
     time: data.time,
-    status: data.status || "pending",
+    status: data.status || "approved",
+    // status: data.status || "pending",
     zoomLink: availability.zoomLink,
   });
 
