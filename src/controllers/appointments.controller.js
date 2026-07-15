@@ -104,3 +104,21 @@ export const getAvailableSlots = asyncHandler(async (req, res) => {
     data: slots,
   });
 });
+
+export const getAppointmentsById = asyncHandler(async (req, res) => {
+  const { search = "", sortBy = "", sortOrder = "asc" } = req.query;
+  const { parentId } = req.body;
+
+  const appointments = await appointmentsService.appointmentsByIdService({
+    search,
+    sortBy,
+    sortOrder,
+    parentId,
+  });
+
+  res.status(200).json({
+    success: true,
+    message: "Appointments retrieved successfully",
+    data: appointments,
+  });
+});

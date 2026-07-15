@@ -64,6 +64,7 @@ router.use("/therapists", therapistsRouter);
 const appointmentsRouter = Router();
 appointmentsRouter.post("/", authenticate, protect, appointmentsController.createAppointment);
 appointmentsRouter.get("/", authenticate, protect, appointmentsController.getAppointments);
+appointmentsRouter.post("/getAppointmentsById", authenticate, protect, appointmentsController.getAppointmentsById);
 appointmentsRouter.get("/:id", authenticate, protect, appointmentsController.getAppointmentById);
 appointmentsRouter.patch("/confirm/:id", authenticate, protect, appointmentsController.confirmAppointment);
 appointmentsRouter.patch("/reschedule/:id", authenticate, protect, appointmentsController.rescheduleAppointment);
