@@ -90,8 +90,12 @@ const getRoleParents = async (flag, userData) => {
     parents.zonalAdmin = zonalAdmin;
   }
 
-  if (flag === 1) {
-    requireField(userData.adminId, "adminId", "Organization Admin");
+  if (flag === 1 || flag === 5) {
+    requireField(
+      userData.adminId,
+      "adminId",
+      flag === 5 ? "Global Therapist" : "Organization Admin"
+    );
     const adminId = toPositiveNumber(userData.adminId, "adminId");
     const admin = await Admin.findOne({ adminId });
     if (!admin) {
@@ -370,34 +374,35 @@ export const registerUser = async (userData) => {
             { session }
           );
           roleDoc = roleDoc[0];
-        // } else if (flag === 3 || flag === 5) {
-        } else if (flag === 3 ) {
+        } else if (flag === 3) {
           roleDoc = await Teacher.create(
             [
               {
                 teacherId: user.userId,
                 userId: user.userId,
                 user: user._id,
-                organizationId: flag === 3 ? parents.organizationAdmin.organizationId : null,
-                organizationAdminId: flag === 3 ? parents.organizationAdmin.organizationAdminId : null,
-                zonalAdminId: flag === 3 ? parents.organizationAdmin.zonalAdminId : null,
-                adminId: flag === 3 ? parents.organizationAdmin.adminId : null,
+                organizationId: parents.organizationAdmin.organizationId,
+                organizationAdminId: parents.organizationAdmin.organizationAdminId,
+                zonalAdminId: parents.organizationAdmin.zonalAdminId,
+                adminId: parents.organizationAdmin.adminId,
               },
             ],
             { session }
           );
           roleDoc = roleDoc[0];
         } else if (flag === 5) {
-          roleDoc = await OrganizationAdmin.create(
+          // A global therapist is also its own organization.  Use the newly
+          // created user's numeric ID for both organization identifiers, then
+          // use those exact values on the therapist record.
+          const organizationAdmin = await OrganizationAdmin.create(
             [
               {
                 organizationAdminId: user.userId,
                 organizationId: user.userId,
-                teacherId: user.userId,
                 userId: user.userId,
                 user: user._id,
-                zonalAdminId: null,
-                adminId: null,
+                zonalAdminId: parents.admin.zonalAdminId,
+                adminId: parents.admin.adminId,
                 organization_type: userData.organization_type ?? null,
                 city : userData.city,
                 state : userData.state,
@@ -416,10 +421,10 @@ export const registerUser = async (userData) => {
                 teacherId: user.userId,
                 userId: user.userId,
                 user: user._id,
-                organizationId: null,
-                organizationAdminId: null,
-                zonalAdminId: null,
-                adminId: null,
+                organizationId: organizationAdmin[0].organizationId,
+                organizationAdminId: organizationAdmin[0].organizationAdminId,
+                zonalAdminId: organizationAdmin[0].zonalAdminId,
+                adminId: organizationAdmin[0].adminId,
               },
             ],
             { session }
@@ -548,41 +553,32 @@ export const registerUser = async (userData) => {
               adminId: flag === 3 ? parents.organizationAdmin.adminId : null,
             });
           } else if (flag === 5) {
-            roleDoc = await OrganizationAdmin.create(
-              [
-                {
-                  organizationAdminId: user.userId,
-                  organizationId: user.userId,
-                  teacherId: user.userId,
-                  userId: user.userId,
-                  user: user._id,
-                  zonalAdminId: null,
-                  adminId: null,
-                  organization_type: userData.organization_type ?? null,
-                  city : userData.city,
-                  state : userData.state,
-                  pincode : userData.pincode,
-                  address : userData.address,
-                  country : userData.country,
-                  phone : userData.phone,
-                },
-              ],
-              { session }
-            );
+            const organizationAdmin = await OrganizationAdmin.create({
+              organizationAdminId: user.userId,
+              organizationId: user.userId,
+              userId: user.userId,
+              user: user._id,
+              zonalAdminId: parents.admin.zonalAdminId,
+              adminId: parents.admin.adminId,
+              organization_type: userData.organization_type ?? null,
+              city: userData.city,
+              state: userData.state,
+              pincode: userData.pincode,
+              address: userData.address,
+              country: userData.country,
+              phone: userData.phone,
+            });
 
             roleDoc = await Teacher.create(
-              [
-                {
-                  teacherId: user.userId,
-                  userId: user.userId,
-                  user: user._id,
-                  organizationId: null,
-                  organizationAdminId: null,
-                  zonalAdminId: null,
-                  adminId: null,
-                },
-              ],
-              { session }
+              {
+                teacherId: user.userId,
+                userId: user.userId,
+                user: user._id,
+                organizationId: organizationAdmin.organizationId,
+                organizationAdminId: organizationAdmin.organizationAdminId,
+                zonalAdminId: organizationAdmin.zonalAdminId,
+                adminId: organizationAdmin.adminId,
+              }
             );
         } else if (flag === 6) {
             roleDoc = await ZonalAdmin.create({

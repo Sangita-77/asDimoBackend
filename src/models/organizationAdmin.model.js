@@ -28,7 +28,7 @@ const organizationAdminSchema = new mongoose.Schema(
       index: true,
     },
     adminId: {
-        type: String,
+        type: Number,
         required: function () {
             return this.flag === 1;
         },
@@ -40,7 +40,7 @@ const organizationAdminSchema = new mongoose.Schema(
         },
     },
     zonalAdminId: {
-        type: String,
+        type: Number,
         required: function () {
             return this.flag === 1;
         },

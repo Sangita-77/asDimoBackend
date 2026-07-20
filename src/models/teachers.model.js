@@ -21,8 +21,9 @@ const teacherSchema = new mongoose.Schema(
       required: true,
       index: true,
     },
-    // Only for TeachersOrg (flag 3). For TeachersGlobal (flag 5) keep null.
-    // This is the organization's users.userId (Number), not Mongo _id
+    // This is the organization's users.userId (Number), not Mongo _id.
+    // A flag-5 therapist is its own organization, so these fields contain
+    // that therapist's userId as well.
     organizationId: {
       type: Number,
       default: null,

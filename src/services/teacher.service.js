@@ -134,9 +134,9 @@ export const approveAppointmentSer = async (appointmentId, status) => {
     throw new Error("Appointment not found");
   }
 
-  if (appointment.status !== "pending") {
-    throw new Error("Only pending appointments can be updated");
-  }
+  // if (appointment.status !== "pending") {
+  //   throw new Error("Only pending appointments can be updated");
+  // }
 
   if (status === "approved") {
 

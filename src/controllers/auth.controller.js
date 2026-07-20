@@ -82,6 +82,13 @@ export const register = asyncHandler(async (req, res) => {
     });
   }
 
+  if (numericFlag === 5 && !adminId) {
+    return res.status(400).json({
+      success: false,
+      message: "adminId is required for Global Therapist",
+    });
+  }
+
   // organization_type mandatory for OrganizationAdmin
   if (numericFlag === 1 && organization_type === undefined) {
     return res.status(400).json({
