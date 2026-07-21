@@ -90,14 +90,13 @@ const userSchema = new mongoose.Schema(
       unique: true,
       index: true,
     },
-<<<<<<< HEAD
+
     org_name: {
       type: String,
       unique: false,
       index: true,
     },
-=======
->>>>>>> 1815ad02d264fedc26a23c6260a140749c65b724
+
   },
   { timestamps: true }
 );

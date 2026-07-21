@@ -5,6 +5,7 @@ import SuperAdmin from "../models/superAdmin.model.js";
 import OrganizationAdmin from "../models/organizationAdmin.model.js";
 import BlacklistLog from "../models/blacklistLog.model.js";
 import ZonalAdmin from "../models/zonalAdmin.model.js";
+import Child from "../models/child.model.js";
 import Admin from "../models/admin.model.js";
 import RefreshToken from "../models/refreshToken.model.js";
 import mongoose from "mongoose";
@@ -2315,4 +2316,25 @@ export const getAllUsersServiceById = async (userId) => {
     roleData,
     relatedData,
   };
+};
+
+export const addChildInformationService = async (parentId, childData) => {
+  const numericParentId = toPositiveNumber(parentId, "parentId");
+  const parent = await Parent.findOne({ parentId: numericParentId });
+
+  if (!parent) {
+    const error = new Error("Parent not found");
+    error.statusCode = 404;
+    throw error;
+  }
+
+  return Child.create({
+    parentId: parent.parentId,
+    childName: childData.childName,
+    childGender: childData.childGender,
+    childAge: Number(childData.childAge),
+    grade: childData.grade,
+    familyType: childData.familyType,
+    language: childData.language,
+  });
 };

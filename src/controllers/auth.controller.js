@@ -13,6 +13,7 @@ import {
   resetPasswordWithOTP,
   getAllUsersServiceById,
   getAllUsersByRelationService,
+  addChildInformationService,
 } from "../services/auth.service.js";
 import {
   sendEmailOtp,
@@ -621,5 +622,48 @@ export const validateUnregisteredEmailOtp = asyncHandler(async (req, res) => {
     success: true,
     message: "OTP validated successfully",
     data: { email: result.email, verified: true },
+  });
+});
+
+export const addChildInformation = asyncHandler(async (req, res) => {
+  const {
+    parentId,
+    childName,
+    childAge,
+    childGender,
+    grade,
+    familyType,
+    language,
+  } = req.body;
+
+  if (
+    parentId === undefined ||
+    !childName ||
+    childAge === undefined ||
+    !childGender ||
+    !grade ||
+    !familyType ||
+    !language
+  ) {
+    return res.status(400).json({
+      success: false,
+      message:
+        "parentId, childName, childAge, childGender, grade, familyType, and language are required",
+    });
+  }
+
+  const child = await addChildInformationService(parentId, {
+    childName,
+    childAge,
+    childGender,
+    grade,
+    familyType,
+    language,
+  });
+
+  res.status(201).json({
+    success: true,
+    message: "Child information added successfully",
+    data: child,
   });
 });

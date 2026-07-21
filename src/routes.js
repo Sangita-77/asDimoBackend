@@ -44,6 +44,7 @@ authRouter.post("/validate-otp", authController.validateEmailOTP);
 authRouter.post("/send-email-otp", authController.sendOtpToEmail);
 authRouter.post("/validate-email-otp", authController.validateUnregisteredEmailOtp);
 authRouter.post("/reset-password", authController.resetPassword);
+authRouter.post("/add-child-information",authenticate,protect,authController.addChildInformation);
 authRouter.get("/profile", authenticate, protect, authController.getProfile);
 // authRouter.put("/profile", authenticate, protect, authController.updateProfile);
 authRouter.put("/updateProfile/:id",authenticate,protect,uploadProfile.single("profileImg"),authController.updateProfile);
