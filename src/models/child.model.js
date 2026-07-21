@@ -43,6 +43,11 @@ const childSchema = new mongoose.Schema(
       required: true,
       trim: true,
     },
+    dob: {
+      type: String,
+      required: true,
+      trim: true,
+    },
   },
   { timestamps: true }
 );

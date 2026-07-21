@@ -634,6 +634,7 @@ export const addChildInformation = asyncHandler(async (req, res) => {
     grade,
     familyType,
     language,
+    dob,
   } = req.body;
 
   if (
@@ -659,6 +660,7 @@ export const addChildInformation = asyncHandler(async (req, res) => {
     grade,
     familyType,
     language,
+    dob,
   });
 
   res.status(201).json({

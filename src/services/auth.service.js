@@ -2336,5 +2336,6 @@ export const addChildInformationService = async (parentId, childData) => {
     grade: childData.grade,
     familyType: childData.familyType,
     language: childData.language,
+    dob: childData.dob,
   });
 };
