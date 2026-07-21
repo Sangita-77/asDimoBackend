@@ -11,6 +11,7 @@ const childSchema = new mongoose.Schema(
     parentId: {
       type: Number,
       required: true,
+      unique: true,
       index: true,
     },
     childName: {

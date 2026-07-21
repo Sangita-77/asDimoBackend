@@ -2328,14 +2328,33 @@ export const addChildInformationService = async (parentId, childData) => {
     throw error;
   }
 
-  return Child.create({
-    parentId: parent.parentId,
-    childName: childData.childName,
-    childGender: childData.childGender,
-    childAge: Number(childData.childAge),
-    grade: childData.grade,
-    familyType: childData.familyType,
-    language: childData.language,
-    dob: childData.dob,
-  });
+  const existingChild = await Child.exists({ parentId: parent.parentId });
+  if (existingChild) {
+    const error = new Error("Child information already exists for this parentId");
+    error.statusCode = 409;
+    throw error;
+  }
+
+  try {
+    return await Child.create({
+      parentId: parent.parentId,
+      childName: childData.childName,
+      childGender: childData.childGender,
+      childAge: Number(childData.childAge),
+      grade: childData.grade,
+      familyType: childData.familyType,
+      language: childData.language,
+      dob: childData.dob,
+    });
+  } catch (error) {
+    // The unique index covers concurrent requests that pass the check above.
+    if (error?.code === 11000 && error?.keyPattern?.parentId) {
+      const conflictError = new Error(
+        "Child information already exists for this parentId"
+      );
+      conflictError.statusCode = 409;
+      throw conflictError;
+    }
+    throw error;
+  }
 };
