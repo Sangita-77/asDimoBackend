@@ -7,6 +7,10 @@ Base URL: `http://<host>:<port>/api`
 ### POST /auth/register
 Registers a new user.
 
+For Therapist (`flag: 3`) and Global Therapist (`flag: 5`) registrations,
+`therapist_category` is required and must be one of: `Psychologist`,
+`speech therapist`, `special educator`, or `operational therapist`.
+
 Request body:
 ```json
 {

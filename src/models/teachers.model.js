@@ -44,11 +44,45 @@ const teacherSchema = new mongoose.Schema(
       default: null,
       index: true,
     },
+    therapist_category: {
+      type: String,
+      index: true,
+      enum: [
+        "Psychologist",
+        "speech therapist",
+        "special educator",
+        "operational therapist",
+      ],
+      required: true,
+    },
+    phone: {
+      type: String,
+      default: null,
+      trim: true,
+    },
+    specialization: {
+      type: [String],
+      default: [],
+      trim: true,
+    },
+    qualifications: {
+      type: [String],
+      default: [],
+      trim: true,
+    },
+    yearsOfExperience: {
+      type: Number,
+      default: 0,
+      min: 0,
+    },
+    licenseNumber: {
+      type: String,
+      default: null,
+      trim: true,
+    },
 
-    // TODO: add more therapist-specific fields here (phone, specialization, etc.)
   },
   { timestamps: true }
 );
 
 export default mongoose.model("Teacher", teacherSchema);
-

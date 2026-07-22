@@ -7,16 +7,25 @@ import {
   import { asyncHandler } from "../utils/asyncHandler.js";
 
 export const addAvailabilityCon = asyncHandler(async (req, res) => {
-  const { userId, date, time } = req.body;
+  const { userId, date, time, medium } = req.body;
 
-  if (!userId || !date || !time) {
+  if (!userId || !date || !time || !medium) {
     return res.status(400).json({
       success: false,
-      message: "please provide userId, date, time",
+      message: "please provide userId, date, time, medium",
     });
   }
 
-  const user = await addAvailabilityservice(userId, date, time);
+  const allowedMediums = ["online", "center", "home"];
+
+  if (!allowedMediums.includes(medium.toLowerCase())) {
+    return res.status(400).json({
+      success: false,
+      message: "Medium must be one of: online, center, home",
+    });
+  }
+
+  const user = await addAvailabilityservice(userId, date, time, medium.toLowerCase());
 
   res.status(200).json({
     success: true,
