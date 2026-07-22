@@ -7,7 +7,7 @@ import { sendEmail } from "../utils/mailer.js";
 
 
 
-export const addAvailabilityservice = async (userId, date, time) => {
+export const addAvailabilityservice = async (userId, date, time, medium) => {
 
   const user = await User.findOne({ userId }).select("flag");
   const flag = user?.flag;
@@ -23,17 +23,34 @@ export const addAvailabilityservice = async (userId, date, time) => {
     throw new Error("This time slot already exists for this user");
   }
 
-  const zoomMeeting = await createZoomMeeting(date, time);
+  if(medium == "online"){
 
-  const availability = await Availability.create({
-    userId,
-    date,
-    time,
-    zoomLink: zoomMeeting.join_url,
-    zoomMeetingId: zoomMeeting.id,
-  });
+    const zoomMeeting = await createZoomMeeting(date, time);
+    const availability = await Availability.create({
+      userId,
+      date,
+      time,
+      zoomLink: zoomMeeting?.join_url || null,
+      zoomMeetingId: zoomMeeting?.id || null,
+      medium,
+    });
 
-  return availability;
+    return availability;
+
+  }else{
+    const availability = await Availability.create({
+      userId,
+      date,
+      time,
+      zoomLink: null,
+      zoomMeetingId: null,
+      medium,
+    });
+
+    return availability;
+  }
+
+
 };
 
 

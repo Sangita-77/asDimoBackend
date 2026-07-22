@@ -44,6 +44,7 @@ export const register = asyncHandler(async (req, res) => {
     phone,
     country,
     org_name,
+    therapist_category,
   } = req.body;
 
   // console.log("BODY =>", req.body);
@@ -61,6 +62,24 @@ export const register = asyncHandler(async (req, res) => {
   }
 
   const numericFlag = Number(flag);
+
+  const therapistCategories = [
+    "Psychologist",
+    "speech therapist",
+    "special educator",
+    "operational therapist",
+  ];
+
+  if (
+    [3, 5].includes(numericFlag) &&
+    !therapistCategories.includes(therapist_category)
+  ) {
+    return res.status(400).json({
+      success: false,
+      message:
+        "therapist_category is required for Therapist and Global Therapist and must be Psychologist, speech therapist, special educator, or operational therapist",
+    });
+  }
 
   if (numericFlag === 6 && (!superAdminId || !city || !state || !pincode || !address)) {
     return res.status(400).json({
@@ -183,6 +202,7 @@ export const register = asyncHandler(async (req, res) => {
     pincode,
     profileImg,
     org_name: generatedOrgName,
+    therapist_category,
   });
 
   res.status(201).json({

@@ -386,6 +386,7 @@ export const registerUser = async (userData) => {
                 organizationAdminId: parents.organizationAdmin.organizationAdminId,
                 zonalAdminId: parents.organizationAdmin.zonalAdminId,
                 adminId: parents.organizationAdmin.adminId,
+                therapist_category: userData.therapist_category,
               },
             ],
             { session }
@@ -426,6 +427,7 @@ export const registerUser = async (userData) => {
                 organizationAdminId: organizationAdmin[0].organizationAdminId,
                 zonalAdminId: organizationAdmin[0].zonalAdminId,
                 adminId: organizationAdmin[0].adminId,
+                therapist_category: userData.therapist_category,
               },
             ],
             { session }
@@ -552,6 +554,7 @@ export const registerUser = async (userData) => {
               organizationAdminId: flag === 3 ? parents.organizationAdmin.organizationAdminId : null,
               zonalAdminId: flag === 3 ? parents.organizationAdmin.zonalAdminId : null,
               adminId: flag === 3 ? parents.organizationAdmin.adminId : null,
+              therapist_category: userData.therapist_category,
             });
           } else if (flag === 5) {
             const organizationAdmin = await OrganizationAdmin.create({
@@ -579,6 +582,7 @@ export const registerUser = async (userData) => {
                 organizationAdminId: organizationAdmin.organizationAdminId,
                 zonalAdminId: organizationAdmin.zonalAdminId,
                 adminId: organizationAdmin.adminId,
+                therapist_category: userData.therapist_category,
               }
             );
         } else if (flag === 6) {

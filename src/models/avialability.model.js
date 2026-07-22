@@ -21,9 +21,16 @@ const availabilitySchema = new mongoose.Schema(
         type: Boolean, 
         default: false 
       },
+
+      medium: {
+        type: String, // "online" or "center" or "home"
+        required: true,
+      },
+
       zoomLink: String,
       zoomMeetingId: String,
       zoomPassword: String,
+
     },
     { timestamps: true }
 );
