@@ -8,7 +8,9 @@ import ZonalAdmin from "../models/zonalAdmin.model.js";
 import Child from "../models/child.model.js";
 import Admin from "../models/admin.model.js";
 import RefreshToken from "../models/refreshToken.model.js";
+import Personalize from "../models/personalize.model.js";
 import mongoose from "mongoose";
+import { OAuth2Client } from "google-auth-library";
 import {
   generateAccessToken,
   generateRefreshToken,
@@ -17,6 +19,7 @@ import {
 import { sendEmail } from "../utils/sendEmail.js";
 // import { generateSessionId } from "../utils/session.js";
 import { sendNotification } from "./notifications.service.js";
+import { env } from "../config/env.js";
 
 
 const generateRandomPassword = (length = 8) => {
@@ -761,6 +764,74 @@ export const loginUser = async (email, password) => {
   await user.save();
 
   // Remove password before returning
+  const userObject = user.toObject();
+  delete userObject.password;
+
+  return {
+    user: userObject,
+    token: accessToken,
+    accessToken,
+    refreshToken,
+  };
+};
+
+export const loginWithGoogle = async (idToken) => {
+  if (!idToken) {
+    const error = new Error("Google ID token is required");
+    error.statusCode = 400;
+    throw error;
+  }
+
+  if (!env.GOOGLE_CLIENT_IDS.length) {
+    const error = new Error("Google login is not configured");
+    error.statusCode = 503;
+    throw error;
+  }
+
+  let payload;
+  try {
+    const ticket = await googleOAuthClient.verifyIdToken({
+      idToken,
+      audience: env.GOOGLE_CLIENT_IDS,
+    });
+    payload = ticket.getPayload();
+  } catch {
+    const error = new Error("Invalid Google ID token");
+    error.statusCode = 401;
+    throw error;
+  }
+
+  if (!payload?.email || payload.email_verified !== true) {
+    const error = new Error("Google account email is not verified");
+    error.statusCode = 401;
+    throw error;
+  }
+
+  const user = await User.findOne({
+    email: payload.email.toLowerCase().trim(),
+  }).select("+password");
+
+  if (!user) {
+    const error = new Error("No AsDimo account exists for this Google email");
+    error.statusCode = 404;
+    throw error;
+  }
+
+  if (user.status !== 1) {
+    const error = new Error("Your account is inactive. Please contact admin.");
+    error.statusCode = 403;
+    throw error;
+  }
+
+  const accessToken = generateAccessToken(user._id.toString());
+  const refreshToken = await createRefreshTokenRecord(
+    user._id.toString(),
+    user._id
+  );
+
+  user.lastLogin = new Date();
+  await user.save();
+
   const userObject = user.toObject();
   delete userObject.password;
 
@@ -2362,3 +2433,127 @@ export const addChildInformationService = async (parentId, childData) => {
     throw error;
   }
 };
+
+export const saveQuestionAnswerService = async ({ parentId, questionAnswers }) => {
+  if (!Number.isFinite(Number(parentId)) || Number(parentId) <= 0) {
+    const error = new Error("A valid parentId is required");
+    error.statusCode = 400;
+    throw error;
+  }
+
+  const numericParentId = toPositiveNumber(parentId, "parentId");
+  const parent = await Parent.findOne({ parentId: numericParentId });
+
+  if (!parent) {
+    const error = new Error("Parent not found");
+    error.statusCode = 404;
+    throw error;
+  }
+
+  const existingChild = await Personalize.exists({ parentId: parent.parentId });
+  if (existingChild) {
+    const error = new Error("Child information already exists for this parentId");
+    error.statusCode = 409;
+    throw error;
+  }
+
+  if (!Array.isArray(questionAnswers) || questionAnswers.length === 0) {
+    const error = new Error("questionAnswers must contain at least one question and answer");
+    error.statusCode = 400;
+    throw error;
+  }
+
+  const answers = questionAnswers.map(({ question, answer }) => {
+    if (typeof question !== "string" || !question.trim()) {
+      const error = new Error("Each questionAnswers item requires a question");
+      error.statusCode = 400;
+      throw error;
+    }
+
+    if (answer === undefined || answer === null) {
+      const error = new Error("Each questionAnswers item requires an answer");
+      error.statusCode = 400;
+      throw error;
+    }
+
+    return { question: question.trim(), answer };
+  });
+
+  return Personalize.findOneAndUpdate(
+    { parentId: Number(parentId) },
+    {
+      $setOnInsert: { parentId: Number(parentId) },
+      $push: { questionAnswers: { $each: answers } },
+    },
+    { new: true, upsert: true, runValidators: true }
+  );
+};
+
+export const getQuestionAnswerService = async (parentId) => {
+  const users = await Personalize.find({ parentId }).select();
+
+  if (!users || users.length === 0) {
+    const error = new Error("No data found");
+    error.statusCode = 404;
+    throw error;
+  }
+
+  return users;
+};
+
+export const updateQuestionAnswerService = async ({ parentId, questionAnswers }) => {
+  if (!Number.isFinite(Number(parentId)) || Number(parentId) <= 0) {
+    const error = new Error("A valid parentId is required");
+    error.statusCode = 400;
+    throw error;
+  }
+
+  const numericParentId = toPositiveNumber(parentId, "parentId");
+  const parent = await Parent.findOne({ parentId: numericParentId });
+
+  if (!parent) {
+    const error = new Error("Parent not found");
+    error.statusCode = 404;
+    throw error;
+  }
+
+  const existingChild = await Personalize.exists({ parentId: parent.parentId });
+  if (existingChild) {
+    const error = new Error("Child information already exists for this parentId");
+    error.statusCode = 409;
+    throw error;
+  }
+
+  if (!Array.isArray(questionAnswers) || questionAnswers.length === 0) {
+    const error = new Error("questionAnswers must contain at least one question and answer");
+    error.statusCode = 400;
+    throw error;
+  }
+
+  const answers = questionAnswers.map(({ question, answer }) => {
+    if (typeof question !== "string" || !question.trim()) {
+      const error = new Error("Each questionAnswers item requires a question");
+      error.statusCode = 400;
+      throw error;
+    }
+
+    if (answer === undefined || answer === null) {
+      const error = new Error("Each questionAnswers item requires an answer");
+      error.statusCode = 400;
+      throw error;
+    }
+
+    return { question: question.trim(), answer };
+  });
+
+  return Personalize.findOneAndUpdate(
+    { parentId: Number(parentId) },
+    {
+      $setOnInsert: { parentId: Number(parentId) },
+      $push: { questionAnswers: { $each: answers } },
+    },
+    { new: true, upsert: true, runValidators: true }
+  );
+};
+
+const googleOAuthClient = new OAuth2Client();

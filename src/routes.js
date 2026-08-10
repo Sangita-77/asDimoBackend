@@ -36,6 +36,7 @@ authRouter.post(
   authController.register
 );
 authRouter.post("/login", authController.login);
+authRouter.post("/google", authController.googleLogin);
 authRouter.post("/refresh-token", authController.refreshToken);
 authRouter.post("/logout", authenticate, protect, authController.logout);
 authRouter.post("/forgot-password", authController.forgotPassword);
@@ -53,6 +54,8 @@ authRouter.post("/getAllUsers", authenticate, protect, authController.getAllUser
 authRouter.post("/getAllUsersByRelation", authenticate, protect, authController.getAllUsersByRelation);
 authRouter.post("/delete",authenticate,protect,authController.deleteUsersCon);
 authRouter.post("/getAllUsersById", authenticate, protect, authController.getAllUsersById);
+authRouter.post("/personalize", authenticate, protect, authController.saveQuestionAnswer);
+authRouter.post("/get-personalize", authenticate, protect, authController.getQuestionAnswer);
 router.use("/auth", authRouter);
 
 const therapistsRouter = Router();
@@ -149,7 +152,6 @@ questionsRouter.delete("/:id", authenticate, protect, questionsController.delete
 questionsRouter.post("/options", authenticate, protect, questionsController.createQuestionOption);
 questionsRouter.post("/recommendations", authenticate, protect, questionsController.createRecommendation);
 router.use("/questions", questionsRouter);
-
 
 
 const gamesRouter = Router();

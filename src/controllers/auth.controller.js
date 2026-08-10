@@ -1,6 +1,7 @@
 import {
   registerUser,
   loginUser,
+  loginWithGoogle,
   getUserById,
   getAllUsersService,
   logoutUser,
@@ -14,6 +15,9 @@ import {
   getAllUsersServiceById,
   getAllUsersByRelationService,
   addChildInformationService,
+  saveQuestionAnswerService,
+  getQuestionAnswerService,
+  updateQuestionAnswerService,
 } from "../services/auth.service.js";
 import {
   sendEmailOtp,
@@ -237,6 +241,17 @@ export const login = asyncHandler(async (req, res) => {
       accessToken,
       refreshToken,
     },
+  });
+});
+
+export const googleLogin = asyncHandler(async (req, res) => {
+  const { idToken } = req.body;
+  const { user, token, accessToken, refreshToken } = await loginWithGoogle(idToken);
+
+  res.status(200).json({
+    success: true,
+    message: "Google login successful",
+    data: { user, token, accessToken, refreshToken },
   });
 });
 
@@ -687,5 +702,37 @@ export const addChildInformation = asyncHandler(async (req, res) => {
     success: true,
     message: "Child information added successfully",
     data: child,
+  });
+});
+
+export const saveQuestionAnswer = asyncHandler(async (req, res) => {
+  const personalize = await saveQuestionAnswerService(req.body);
+
+  res.status(200).json({
+    success: true,
+    message: "Question and answer saved successfully",
+    data: personalize,
+  });
+});
+
+export const getQuestionAnswer = asyncHandler(async (req, res) => {
+
+  const { parentId } = req.body;
+  const personalize = await getQuestionAnswerService(parentId);
+
+  res.status(200).json({
+    success: true,
+    message: "get data successfully",
+    data: personalize,
+  });
+});
+
+export const updateQuestionAnswer = asyncHandler(async (req, res) => {
+  const personalize = await updateQuestionAnswerService(req.body);
+
+  res.status(200).json({
+    success: true,
+    message: "Question and answer updated successfully",
+    data: personalize,
   });
 });

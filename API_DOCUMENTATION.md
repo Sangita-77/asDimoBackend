@@ -75,6 +75,42 @@ Response:
 
 ---
 
+### POST /auth/google
+Sign in an existing AsDimo user with a Google ID token. The server validates the
+token signature and its audience before issuing the normal application access and
+refresh tokens.
+
+Request body:
+```json
+{
+  "idToken": "<google-id-token>"
+}
+```
+
+Response:
+```json
+{
+  "success": true,
+  "message": "Google login successful",
+  "data": {
+    "user": { "_id": "...", "userId": 123, "flag": 2, "email": "john@example.com" },
+    "token": "<jwt-access-token>",
+    "accessToken": "<jwt-access-token>",
+    "refreshToken": "<jwt-refresh-token>"
+  }
+}
+```
+
+Set `GOOGLE_CLIENT_IDS` in the backend `.env` to the comma-separated Google OAuth
+client ID(s) allowed to mint the frontend's ID token. For a mobile app this is
+normally the Web client ID supplied to the Google sign-in SDK.
+
+This endpoint signs in only users who already exist in AsDimo with the same,
+verified Google email address; it does not create a user or bypass inactive-user
+checks.
+
+---
+
 ### POST /auth/logout
 Invalidate current JWT token.
 
