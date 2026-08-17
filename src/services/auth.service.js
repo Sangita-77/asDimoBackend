@@ -11,6 +11,7 @@ import RefreshToken from "../models/refreshToken.model.js";
 import Personalize from "../models/personalize.model.js";
 import mongoose from "mongoose";
 import { OAuth2Client } from "google-auth-library";
+import axios from "axios";
 import {
   generateAccessToken,
   generateRefreshToken,
@@ -776,13 +777,13 @@ export const loginUser = async (email, password) => {
 };
 
 export const loginWithGoogle = async (idToken) => {
-  if (!idToken) {
+  if (typeof idToken !== "string" || !idToken.trim()) {
     const error = new Error("Google ID token is required");
     error.statusCode = 400;
     throw error;
   }
 
-  if (!env.GOOGLE_CLIENT_IDS.length) {
+  if (!Array.isArray(env.GOOGLE_CLIENT_IDS) || env.GOOGLE_CLIENT_IDS.length === 0) {
     const error = new Error("Google login is not configured");
     error.statusCode = 503;
     throw error;
@@ -807,9 +808,26 @@ export const loginWithGoogle = async (idToken) => {
     throw error;
   }
 
-  const user = await User.findOne({
-    email: payload.email.toLowerCase().trim(),
-  }).select("+password");
+  const googleId = payload.sub;
+  if (!googleId) {
+    const error = new Error("Google ID token does not contain a user ID");
+    error.statusCode = 401;
+    throw error;
+  }
+
+  const email = payload.email.toLowerCase().trim();
+  const [userByGoogleId, userByEmail] = await Promise.all([
+    User.findOne({ googleId }).select("+password"),
+    User.findOne({ email }).select("+password"),
+  ]);
+
+  if (userByGoogleId && userByEmail && !userByGoogleId._id.equals(userByEmail._id)) {
+    const error = new Error("This Google account is already linked to another user");
+    error.statusCode = 409;
+    throw error;
+  }
+
+  const user = userByGoogleId || userByEmail;
 
   if (!user) {
     const error = new Error("No AsDimo account exists for this Google email");
@@ -822,6 +840,16 @@ export const loginWithGoogle = async (idToken) => {
     error.statusCode = 403;
     throw error;
   }
+
+  // Save only verified identity data from Google's signed ID token. This links
+  // an existing AsDimo account to Google on its first successful Google login.
+  user.googleId = googleId;
+  user.authProvider = "google";
+  user.googleProfile = {
+    name: payload.name || null,
+    picture: payload.picture || null,
+    email,
+  };
 
   const accessToken = generateAccessToken(user._id.toString());
   const refreshToken = await createRefreshTokenRecord(
@@ -839,6 +867,138 @@ export const loginWithGoogle = async (idToken) => {
     user: userObject,
     token: accessToken,
     accessToken,
+    refreshToken,
+  };
+};
+
+export const loginWithFacebook = async (accessToken) => {
+  if (typeof accessToken !== "string" || !accessToken.trim()) {
+    const error = new Error("Facebook access token is required");
+    error.statusCode = 400;
+    throw error;
+  }
+
+  if (!env.FACEBOOK_APP_ID || !env.FACEBOOK_APP_SECRET) {
+    const error = new Error("Facebook login is not configured");
+    error.statusCode = 503;
+    throw error;
+  }
+
+  const graphBaseUrl = `https://graph.facebook.com/${env.FACEBOOK_GRAPH_API_VERSION}`;
+  const appAccessToken = `${env.FACEBOOK_APP_ID}|${env.FACEBOOK_APP_SECRET}`;
+  let facebookUser;
+  let validatedFacebookId;
+
+  try {
+    const debugResponse = await axios.get(`${graphBaseUrl}/debug_token`, {
+      params: { input_token: accessToken, access_token: appAccessToken },
+    });
+    const tokenData = debugResponse.data?.data;
+
+    if (!tokenData?.is_valid || String(tokenData.app_id) !== env.FACEBOOK_APP_ID || !tokenData.user_id) {
+      console.warn("Facebook token validation failed", {
+        isValid: tokenData?.is_valid ?? false,
+        hasUserId: Boolean(tokenData?.user_id),
+        belongsToConfiguredApp: String(tokenData?.app_id) === env.FACEBOOK_APP_ID,
+        facebookErrorCode: tokenData?.error?.code,
+        facebookErrorSubcode: tokenData?.error?.error_subcode,
+      });
+      const error = new Error(
+        "Facebook access token is invalid, expired, or belongs to a different Facebook app"
+      );
+      error.statusCode = 401;
+      throw error;
+    }
+    validatedFacebookId = String(tokenData.user_id);
+
+    const profileResponse = await axios.get(`${graphBaseUrl}/me`, {
+      params: {
+        fields: "id,name,email,picture.type(large)",
+        access_token: accessToken,
+      },
+    });
+    facebookUser = profileResponse.data;
+  } catch (caughtError) {
+    if (caughtError.statusCode) {
+      throw caughtError;
+    }
+
+    const facebookError = caughtError.response?.data?.error;
+    console.warn("Facebook token verification request failed", {
+      status: caughtError.response?.status,
+      facebookErrorCode: facebookError?.code,
+      facebookErrorSubcode: facebookError?.error_subcode,
+      facebookErrorType: facebookError?.type,
+    });
+    const error = new Error("Facebook access token could not be verified");
+    error.statusCode = 401;
+    throw error;
+  }
+
+  const facebookId = String(facebookUser?.id || "");
+  if (!facebookId) {
+    const error = new Error("Facebook profile does not contain a user ID");
+    error.statusCode = 401;
+    throw error;
+  }
+
+  if (facebookId !== validatedFacebookId) {
+    const error = new Error("Facebook token profile does not match the validated user");
+    error.statusCode = 401;
+    throw error;
+  }
+
+  const email = typeof facebookUser.email === "string"
+    ? facebookUser.email.toLowerCase().trim()
+    : null;
+  const [userByFacebookId, userByEmail] = await Promise.all([
+    User.findOne({ facebookId }).select("+password"),
+    email ? User.findOne({ email }).select("+password") : null,
+  ]);
+
+  if (userByFacebookId && userByEmail && !userByFacebookId._id.equals(userByEmail._id)) {
+    const error = new Error("This Facebook account is already linked to another user");
+    error.statusCode = 409;
+    throw error;
+  }
+
+  const user = userByFacebookId || userByEmail;
+  if (!user) {
+    const error = new Error(
+      email
+        ? "No AsDimo account exists for this Facebook email"
+        : "Facebook did not provide an email; link Facebook from an existing account first"
+    );
+    error.statusCode = 404;
+    throw error;
+  }
+
+  if (user.status !== 1) {
+    const error = new Error("Your account is inactive. Please contact admin.");
+    error.statusCode = 403;
+    throw error;
+  }
+
+  user.facebookId = facebookId;
+  user.authProvider = "facebook";
+  user.facebookProfile = {
+    name: facebookUser.name || null,
+    picture: facebookUser.picture?.data?.url || null,
+    email,
+  };
+
+  const appJwt = generateAccessToken(user._id.toString());
+  const refreshToken = await createRefreshTokenRecord(user._id.toString(), user._id);
+  user.lastLogin = new Date();
+  await user.save();
+
+  const userObject = user.toObject();
+  delete userObject.password;
+
+  return {
+    user: userObject,
+    token: appJwt,
+    accessToken: appJwt,
     refreshToken,
   };
 };

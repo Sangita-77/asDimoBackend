@@ -25,6 +25,38 @@ const userSchema = new mongoose.Schema(
       minlength: 6,
       select: false, // Don't include password in queries by default
     },
+    // Google identity is stored only after a Google ID token has been verified
+    // by the backend. `googleId` is the token's immutable Google subject (`sub`).
+    googleId: {
+      type: String,
+      unique: true,
+      sparse: true,
+      index: true,
+      trim: true,
+    },
+    authProvider: {
+      type: String,
+      enum: ["password", "google", "facebook"],
+      default: "password",
+    },
+    googleProfile: {
+      name: { type: String, default: null, trim: true },
+      picture: { type: String, default: null, trim: true },
+      email: { type: String, default: null, lowercase: true, trim: true },
+    },
+    // Facebook identity is stored only after Facebook validates its access token.
+    facebookId: {
+      type: String,
+      unique: true,
+      sparse: true,
+      index: true,
+      trim: true,
+    },
+    facebookProfile: {
+      name: { type: String, default: null, trim: true },
+      picture: { type: String, default: null, trim: true },
+      email: { type: String, default: null, lowercase: true, trim: true },
+    },
     flag: {
       type: Number,
       required: true,

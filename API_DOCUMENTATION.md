@@ -107,7 +107,49 @@ normally the Web client ID supplied to the Google sign-in SDK.
 
 This endpoint signs in only users who already exist in AsDimo with the same,
 verified Google email address; it does not create a user or bypass inactive-user
-checks.
+checks. On a successful login, it stores the verified Google subject, name,
+picture, and email in the matching user record.
+
+---
+
+### POST /auth/facebookLogin
+
+Sign in an existing AsDimo user with a Facebook user access token. The backend
+verifies that the token is valid and belongs to the configured Facebook app
+before issuing application tokens.
+
+Request body:
+```json
+{
+  "accessToken": "<facebook-user-access-token>"
+}
+```
+
+Response:
+```json
+{
+  "success": true,
+  "message": "Facebook login successful",
+  "data": {
+    "user": { "_id": "...", "userId": 123, "flag": 2, "email": "john@example.com" },
+    "token": "<jwt-access-token>",
+    "accessToken": "<jwt-access-token>",
+    "refreshToken": "<jwt-refresh-token>"
+  }
+}
+```
+
+Configure these backend `.env` variables (never expose the app secret to the
+frontend):
+```env
+FACEBOOK_APP_ID=your-facebook-app-id
+FACEBOOK_APP_SECRET=your-facebook-app-secret
+FACEBOOK_GRAPH_API_VERSION=v22.0
+```
+
+The Facebook login permission must include `email`. This endpoint only signs in
+an existing AsDimo user with the matching email and saves the verified Facebook
+ID, name, profile picture, and email in that user record.
 
 ---
 

@@ -201,8 +201,3 @@ export const approveAppointmentSer = async (appointmentId, status) => {
 
   return appointment;
 };
-
-export const getAvailabilitySlotsService = async (therapistId) => {
-  const therapist = await Availability.find({ userId: therapistId }).lean();
-  return therapist;
-};

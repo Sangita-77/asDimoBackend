@@ -2,6 +2,7 @@ import {
   registerUser,
   loginUser,
   loginWithGoogle,
+  loginWithFacebook,
   getUserById,
   getAllUsersService,
   logoutUser,
@@ -245,13 +246,41 @@ export const login = asyncHandler(async (req, res) => {
 });
 
 export const googleLogin = asyncHandler(async (req, res) => {
-  const { idToken } = req.body;
-  const { user, token, accessToken, refreshToken } = await loginWithGoogle(idToken);
+  const { idToken } = req.body || {};
+
+  if (typeof idToken !== "string" || !idToken.trim()) {
+    return res.status(400).json({
+      success: false,
+      message: "Google ID token is required",
+    });
+  }
+
+  const { user, token, accessToken, refreshToken } = await loginWithGoogle(idToken.trim());
 
   res.status(200).json({
     success: true,
     message: "Google login successful",
     data: { user, token, accessToken, refreshToken },
+  });
+});
+
+export const facebookLogin = asyncHandler(async (req, res) => {
+  const { accessToken } = req.body || {};
+
+  if (typeof accessToken !== "string" || !accessToken.trim()) {
+    return res.status(400).json({
+      success: false,
+      message: "Facebook access token is required",
+    });
+  }
+
+  const { user, token, accessToken: appAccessToken, refreshToken } =
+    await loginWithFacebook(accessToken.trim());
+
+  res.status(200).json({
+    success: true,
+    message: "Facebook login successful",
+    data: { user, token, accessToken: appAccessToken, refreshToken },
   });
 });
 
