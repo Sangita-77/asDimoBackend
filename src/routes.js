@@ -57,6 +57,7 @@ authRouter.post("/delete",authenticate,protect,authController.deleteUsersCon);
 authRouter.post("/getAllUsersById", authenticate, protect, authController.getAllUsersById);
 authRouter.post("/personalize", authenticate, protect, authController.saveQuestionAnswer);
 authRouter.post("/get-personalize", authenticate, protect, authController.getQuestionAnswer);
+authRouter.put("/updateUserRelation",authenticate,protect,authController.updateUserRelation);
 router.use("/auth", authRouter);
 
 const therapistsRouter = Router();
@@ -80,6 +81,7 @@ router.use("/appointments", appointmentsRouter);
 
 
 const dashboardRouter = Router();
+dashboardRouter.get("/user-counts", authenticate, protect, dashboardController.getUserCountsByFlag);
 dashboardRouter.get("/super-admin", authenticate, protect, dashboardController.getSuperAdminDashboard);
 dashboardRouter.get("/organization-admin", authenticate, protect, dashboardController.getOrganizationAdminDashboard);
 dashboardRouter.get("/parent", authenticate, protect, dashboardController.getParentDashboard);

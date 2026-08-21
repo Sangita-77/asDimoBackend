@@ -199,7 +199,8 @@ export const getAppointments = async ({
   sortBy = "",
   sortOrder = "asc",
 }) => {
-  const appointments = await Appointment.find().lean();
+  // const appointments = await Appointment.find().lean();
+  const appointments = await Appointment.find().limit(6).lean();
 
   let enrichedAppointments = await Promise.all(
     appointments.map(async (appointment) => {
@@ -338,6 +339,8 @@ export const getAppointments = async ({
       return 0;
     });
   }
+
+  enrichedAppointments = enrichedAppointments.slice(0, 6);
 
   return enrichedAppointments;
 };

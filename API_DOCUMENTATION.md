@@ -381,6 +381,32 @@ Response example:
 
 ## User Management
 
+### Get User Counts by Role
+
+**GET** `/dashboard/user-counts`
+
+Returns user totals from the `User` table. Parent includes flags `2` and `4`; Therapist includes flags `3` and `5`.
+
+**Headers:** `Authorization: Bearer <token>`
+
+**Response:**
+
+```json
+{
+  "success": true,
+  "message": "User counts retrieved successfully",
+  "data": {
+    "totalUsers": 42,
+    "superAdmin": 1,
+    "organizationAdmin": 4,
+    "parent": 20,
+    "therapist": 10,
+    "zonalAdmin": 2,
+    "admin": 5
+  }
+}
+```
+
 ### POST /users
 Create a new user.
 

@@ -1,6 +1,16 @@
 import { asyncHandler } from "../utils/asyncHandler.js";
 import * as dashboardService from "../services/dashboard.service.js";
 
+export const getUserCountsByFlag = asyncHandler(async (req, res) => {
+  const data = await dashboardService.getUserCountsByFlag();
+
+  res.status(200).json({
+    success: true,
+    message: "User counts retrieved successfully",
+    data,
+  });
+});
+
 export const getSuperAdminDashboard = asyncHandler(async (req, res) => {
   const data = await dashboardService.getSuperAdminDashboard();
   res.status(200).json({

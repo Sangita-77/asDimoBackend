@@ -7,6 +7,34 @@ import Game from "../models/game.model.js";
 import Subscription from "../models/subscription.model.js";
 import Payment from "../models/payment.model.js";
 
+export const getUserCountsByFlag = async () => {
+  const counts = await User.aggregate([
+    {
+      $group: {
+        _id: "$flag",
+        count: { $sum: 1 },
+      },
+    },
+  ]);
+
+  const countsByFlag = Object.fromEntries(
+    counts.map(({ _id, count }) => [Number(_id), count])
+  );
+  const getCount = (flag) => countsByFlag[flag] || 0;
+  const totalAppointments = await Appointment.countDocuments();
+
+  return {
+    totalUsers: counts.reduce((total, { count }) => total + count, 0),
+    superAdmin: getCount(0),
+    organizationAdmin: getCount(1),
+    parent: getCount(2) + getCount(4),
+    therapist: getCount(3) + getCount(5),
+    zonalAdmin: getCount(6),
+    admin: getCount(7),
+    totalAppointments,
+  };
+};
+
 export const getSuperAdminDashboard = async () => {
   const totalUsers = await User.countDocuments();
   const totalOrganizations = await Organization.countDocuments();

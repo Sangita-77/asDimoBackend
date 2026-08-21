@@ -19,6 +19,7 @@ import {
   saveQuestionAnswerService,
   getQuestionAnswerService,
   updateQuestionAnswerService,
+  updateUserRelationService,
 } from "../services/auth.service.js";
 import {
   sendEmailOtp,
@@ -763,5 +764,47 @@ export const updateQuestionAnswer = asyncHandler(async (req, res) => {
     success: true,
     message: "Question and answer updated successfully",
     data: personalize,
+  });
+});
+
+
+export const updateUserRelation = asyncHandler(async (req, res) => {
+  const {
+    flag,
+    userId,
+    updatedUserId,
+  } = req.body;
+
+  if (flag === undefined || flag === null) {
+    return res.status(400).json({
+      success: false,
+      message: "flag is required",
+    });
+  }
+
+  if (userId === undefined || userId === null) {
+    return res.status(400).json({
+      success: false,
+      message: "userId is required",
+    });
+  }
+
+  if (updatedUserId === undefined || updatedUserId === null) {
+    return res.status(400).json({
+      success: false,
+      message: "updatedUserId is required",
+    });
+  }
+
+  const result = await updateUserRelationService({
+    flag,
+    userId,
+    updatedUserId,
+  });
+
+  res.status(200).json({
+    success: true,
+    message: "User relation updated successfully",
+    data: result,
   });
 });

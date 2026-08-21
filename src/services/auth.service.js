@@ -2716,4 +2716,208 @@ export const updateQuestionAnswerService = async ({ parentId, questionAnswers })
   );
 };
 
+
+export const updateUserRelationService = async ({
+  flag,
+  userId,
+  updatedUserId,
+}) => {
+  const numericFlag = Number(flag);
+  const currentUserId = Number(userId);
+  const newUserId = Number(updatedUserId);
+
+  if (!Number.isInteger(numericFlag)) {
+    const error = new Error("Invalid flag");
+    error.statusCode = 400;
+    throw error;
+  }
+
+  if (!Number.isInteger(currentUserId) || currentUserId <= 0) {
+    const error = new Error("Invalid userId");
+    error.statusCode = 400;
+    throw error;
+  }
+
+  if (!Number.isInteger(newUserId) || newUserId <= 0) {
+    const error = new Error("Invalid updatedUserId");
+    error.statusCode = 400;
+    throw error;
+  }
+
+  /*
+   * FLAG 7
+   *
+   * Existing Admin:
+   *   userId = current admin
+   *
+   * Update:
+   *   Admin.zonalAdminId = updatedUserId
+   */
+  if (numericFlag === 7) {
+    const admin = await Admin.findOne({
+      userId: currentUserId,
+    });
+
+    if (!admin) {
+      const error = new Error(
+        `Admin not found with userId ${currentUserId}`
+      );
+      error.statusCode = 404;
+      throw error;
+    }
+
+    const zonalAdmin = await ZonalAdmin.findOne({
+      zonalAdminId: newUserId,
+    });
+
+    if (!zonalAdmin) {
+      const error = new Error(
+        `Zonal Admin not found with userId ${newUserId}`
+      );
+      error.statusCode = 404;
+      throw error;
+    }
+
+    admin.zonalAdminId = newUserId;
+
+    await admin.save();
+
+    return {
+      flag: numericFlag,
+      userId: currentUserId,
+      updatedUserId: newUserId,
+      type: "Admin",
+      data: admin,
+    };
+  }
+
+  /*
+   * FLAG 1
+   *
+   * Existing Organization Admin:
+   *   userId = organization admin
+   *
+   * 1. organizationadmins.adminId = updatedUserId
+   *
+   * 2. Find Admin where:
+   *      Admin.userId === updatedUserId
+   *
+   * 3. Get Admin.zonalAdminId
+   *
+   * 4. organizationadmins.zonalAdminId =
+   *      Admin.zonalAdminId
+   */
+  if (numericFlag === 1) {
+    const organizationAdmin = await OrganizationAdmin.findOne({
+      userId: currentUserId,
+    });
+
+    if (!organizationAdmin) {
+      const error = new Error(
+        `Organization Admin not found with userId ${currentUserId}`
+      );
+      error.statusCode = 404;
+      throw error;
+    }
+
+    const admin = await Admin.findOne({
+      userId: newUserId,
+    });
+
+    if (!admin) {
+      const error = new Error(
+        `Admin not found with userId ${newUserId}`
+      );
+      error.statusCode = 404;
+      throw error;
+    }
+
+    organizationAdmin.adminId = newUserId;
+    organizationAdmin.zonalAdminId = admin.zonalAdminId;
+
+    await organizationAdmin.save();
+
+    return {
+      flag: numericFlag,
+      userId: currentUserId,
+      updatedUserId: newUserId,
+      type: "OrganizationAdmin",
+      data: organizationAdmin,
+    };
+  }
+
+  /*
+   * FLAG 3
+   *
+   * Existing Teacher/Therapist:
+   *   userId = teacher
+   *
+   * updatedUserId = new Organization Admin
+   *
+   * Find OrganizationAdmin:
+   *   organizationAdminId === updatedUserId
+   *
+   * Then update Teacher:
+   *
+   *   organizationAdminId = OrganizationAdmin.organizationAdminId
+   *   organizationId      = OrganizationAdmin.organizationId
+   *   adminId             = OrganizationAdmin.adminId
+   *   zonalAdminId        = OrganizationAdmin.zonalAdminId
+   */
+  if (numericFlag === 3) {
+    const teacher = await Teacher.findOne({
+      userId: currentUserId,
+    });
+
+    if (!teacher) {
+      const error = new Error(
+        `Teacher not found with userId ${currentUserId}`
+      );
+      error.statusCode = 404;
+      throw error;
+    }
+
+    const organizationAdmin = await OrganizationAdmin.findOne({
+      organizationAdminId: newUserId,
+    });
+
+    if (!organizationAdmin) {
+      const error = new Error(
+        `Organization Admin not found with organizationAdminId ${newUserId}`
+      );
+      error.statusCode = 404;
+      throw error;
+    }
+
+    teacher.organizationAdminId =
+      organizationAdmin.organizationAdminId;
+
+    teacher.organizationId =
+      organizationAdmin.organizationId;
+
+    teacher.adminId =
+      organizationAdmin.adminId;
+
+    teacher.zonalAdminId =
+      organizationAdmin.zonalAdminId;
+
+    await teacher.save();
+
+    return {
+      flag: numericFlag,
+      userId: currentUserId,
+      updatedUserId: newUserId,
+      type: "Teacher",
+      data: teacher,
+    };
+  }
+
+  const error = new Error(
+    "Relation update is supported only for flag 7, 1, and 3"
+  );
+  error.statusCode = 400;
+  throw error;
+};
+
+
 const googleOAuthClient = new OAuth2Client();
