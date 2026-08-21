@@ -1135,6 +1135,302 @@ const applySearchAndSort = (users, options = {}) => {
     return String(firstValue).localeCompare(String(secondValue)) * multiplier;
   });
 };
+///////////////////////// 21/08/2026 ////////////////
+// const getRelatedRoleData = async (user, roleData) => {
+//   if (!roleData || Object.keys(roleData).length === 0) {
+//     return null;
+//   }
+
+//   if (user.flag === 6) {
+//     const admins = await Admin.find({
+//       zonalAdminId: roleData.zonalAdminId,
+//     }).lean();
+//     const adminIds = uniqueNumbers(admins.map((admin) => admin.adminId));
+
+//     const organizations = await OrganizationAdmin.find({
+//       zonalAdminId: roleData.zonalAdminId,
+//       ...(adminIds.length ? { adminId: { $in: adminIds } } : {}),
+//     }).lean();
+
+//     const organizationIds = uniqueNumbers(
+//       organizations.map((org) => org.organizationId)
+//     );
+//     const organizationAdminIds = uniqueNumbers(
+//       organizations.map((org) => org.organizationAdminId)
+//     );
+
+//     const teachers = organizationIds.length
+//       ? await Teacher.find({
+//           $or: [
+//             {
+//               zonalAdminId: roleData.zonalAdminId,
+//               adminId: { $in: adminIds },
+//               organizationId: { $in: organizationIds },
+//             },
+//             {
+//               organizationId: { $in: organizationIds },
+//               organizationAdminId: { $in: organizationAdminIds },
+//             },
+//           ],
+//         }).lean()
+//       : [];
+
+//     const teacherIds = uniqueNumbers(teachers.map((teacher) => teacher.teacherId));
+//     const parents =
+//       organizationIds.length && teacherIds.length
+//         ? await Parent.find({
+//             $or: [
+//               {
+//                 zonalAdminId: roleData.zonalAdminId,
+//                 adminId: { $in: adminIds },
+//                 organizationId: { $in: organizationIds },
+//                 teacherId: { $in: teacherIds },
+//               },
+//               {
+//                 organizationId: { $in: organizationIds },
+//                 therapistId: { $in: teacherIds },
+//               },
+//             ],
+//           }).lean()
+//         : [];
+
+//     return {
+//       admins: withCount(admins),
+//       organizations: withCount(organizations),
+//       teachers: withCount(teachers),
+//       parents: withCount(parents),
+//     };
+//   }
+
+//   if (user.flag === 7) {
+//     const zonalAdmin = await User.findOne({
+//       userId: roleData.zonalAdminId,
+//     }).lean();
+
+//     if (!zonalAdmin) {
+//       return {
+//         organizations: withCount([]),
+//         teachers: withCount([]),
+//         parents: withCount([]),
+//       };
+//     }
+
+//     const organizations = await OrganizationAdmin.find({
+//       zonalAdminId: roleData.zonalAdminId,
+//       adminId: roleData.adminId,
+//     }).lean();
+
+//     const organizationIds = uniqueNumbers(
+//       organizations.map((org) => org.organizationId)
+//     );
+//     const organizationAdminIds = uniqueNumbers(
+//       organizations.map((org) => org.organizationAdminId)
+//     );
+
+//     const teachers = organizationIds.length
+//       ? await Teacher.find({
+//           $or: [
+//             {
+//               zonalAdminId: roleData.zonalAdminId,
+//               adminId: roleData.adminId,
+//               organizationId: { $in: organizationIds },
+//             },
+//             {
+//               organizationId: { $in: organizationIds },
+//               organizationAdminId: { $in: organizationAdminIds },
+//             },
+//           ],
+//         }).lean()
+//       : [];
+
+//     const teacherIds = uniqueNumbers(teachers.map((teacher) => teacher.teacherId));
+//     const parents =
+//       organizationIds.length && teacherIds.length
+//         ? await Parent.find({
+//             $or: [
+//               {
+//                 zonalAdminId: roleData.zonalAdminId,
+//                 adminId: roleData.adminId,
+//                 organizationId: { $in: organizationIds },
+//                 teacherId: { $in: teacherIds },
+//               },
+//               {
+//                 organizationId: { $in: organizationIds },
+//                 therapistId: { $in: teacherIds },
+//               },
+//             ],
+//           }).lean()
+//         : [];
+
+//     return {
+//       zonalAdmin,
+//       organizations: withCount(organizations),
+//       teachers: withCount(teachers),
+//       parents: withCount(parents),
+//     };
+//   }
+
+//   if (user.flag === 1) {
+
+//     const Admin = await User.findOne({
+//       userId: roleData.adminId,
+//     }).lean();
+
+//     if (!Admin) {
+//       return {
+//         organizations: withCount([]),
+//         teachers: withCount([]),
+//         parents: withCount([]),
+//       };
+//     }
+//     const teachers = await Teacher.find({
+//       $or: [
+//         {
+//           zonalAdminId: roleData.zonalAdminId,
+//           adminId: roleData.adminId,
+//           organizationId: roleData.organizationId,
+//         },
+//         {
+//           organizationId: roleData.organizationId,
+//           organizationAdminId: roleData.organizationAdminId,
+//         },
+//       ],
+//     }).lean();
+
+//     const teacherIds = uniqueNumbers(teachers.map((teacher) => teacher.teacherId));
+//     const parents = teacherIds.length
+//       ? await Parent.find({
+//           $or: [
+//             {
+//               zonalAdminId: roleData.zonalAdminId,
+//               adminId: roleData.adminId,
+//               organizationId: roleData.organizationId,
+//               teacherId: { $in: teacherIds },
+//             },
+//             {
+//               organizationId: roleData.organizationId,
+//               therapistId: { $in: teacherIds },
+//             },
+//           ],
+//         }).lean()
+//       : [];
+
+//     return {
+//       Admin,
+//       teachers: withCount(teachers),
+//       parents: withCount(parents),
+//     };
+//   }
+
+//   if (user.flag === 3) {
+
+//     const Admin = await User.findOne({
+//       userId: roleData.adminId,
+//     }).lean();
+
+//     if (!Admin) {
+//       return {
+//         organizations: withCount([]),
+//         teachers: withCount([]),
+//         parents: withCount([]),
+//       };
+//     }
+
+//     const organizations = await User.findOne({
+//       userId: roleData.organizationId,
+//     }).lean();
+
+//     if (!organizations) {
+//       return {
+//         organizations: withCount([]),
+//         teachers: withCount([]),
+//         parents: withCount([]),
+//       };
+//     }
+
+//     const parentFilters = [
+//       {
+//         organizationId: roleData.organizationId,
+//         therapistId: roleData.teacherId,
+//       },
+//     ];
+
+//     if (roleData.zonalAdminId !== undefined && roleData.zonalAdminId !== null) {
+//       parentFilters.push({
+//         zonalAdminId: roleData.zonalAdminId,
+//         adminId: roleData.adminId,
+//         organizationId: roleData.organizationId,
+//         teacherId: roleData.teacherId,
+//       });
+//     }
+
+//     const parents = await Parent.find({
+//       $or: parentFilters,
+//     }).lean();
+
+//     return {
+//       Admin,
+//       organizations,
+//       parents: withCount(parents),
+//     };
+//   }
+
+//   if (user.flag === 2) {
+
+//     const Admin = await User.findOne({
+//       userId: roleData.adminId,
+//     }).lean();
+
+//     if (!Admin) {
+//       return {
+//         organizations: withCount([]),
+//         teachers: withCount([]),
+//         parents: withCount([]),
+//       };
+//     }
+
+//     const organizations = await User.findOne({
+//       userId: roleData.organizationId,
+//     }).lean();
+
+//     if (!organizations) {
+//       return {
+//         organizations: withCount([]),
+//         teachers: withCount([]),
+//         parents: withCount([]),
+//       };
+//     }
+
+//     const parentFilters = [
+//       {
+//         organizationId: roleData.organizationId,
+//         therapistId: roleData.teacherId,
+//       },
+//     ];
+
+//     if (roleData.zonalAdminId !== undefined && roleData.zonalAdminId !== null) {
+//       parentFilters.push({
+//         zonalAdminId: roleData.zonalAdminId,
+//         adminId: roleData.adminId,
+//         organizationId: roleData.organizationId,
+//         teacherId: roleData.teacherId,
+//       });
+//     }
+
+//     const parents = await Parent.find({
+//       $or: parentFilters,
+//     }).lean();
+
+//     return {
+//       Admin,
+//       organizations,
+//       parents: withCount(parents),
+//     };
+//   }
+
+//   return null;
+// };
+////////////////////////////////////////////////////////
 
 const getRelatedRoleData = async (user, roleData) => {
   if (!roleData || Object.keys(roleData).length === 0) {
@@ -1145,16 +1441,22 @@ const getRelatedRoleData = async (user, roleData) => {
     const admins = await Admin.find({
       zonalAdminId: roleData.zonalAdminId,
     }).lean();
-    const adminIds = uniqueNumbers(admins.map((admin) => admin.adminId));
+
+    const adminIds = uniqueNumbers(
+      admins.map((admin) => admin.adminId)
+    );
 
     const organizations = await OrganizationAdmin.find({
       zonalAdminId: roleData.zonalAdminId,
-      ...(adminIds.length ? { adminId: { $in: adminIds } } : {}),
+      ...(adminIds.length
+        ? { adminId: { $in: adminIds } }
+        : {}),
     }).lean();
 
     const organizationIds = uniqueNumbers(
       organizations.map((org) => org.organizationId)
     );
+
     const organizationAdminIds = uniqueNumbers(
       organizations.map((org) => org.organizationAdminId)
     );
@@ -1175,7 +1477,10 @@ const getRelatedRoleData = async (user, roleData) => {
         }).lean()
       : [];
 
-    const teacherIds = uniqueNumbers(teachers.map((teacher) => teacher.teacherId));
+    const teacherIds = uniqueNumbers(
+      teachers.map((teacher) => teacher.teacherId)
+    );
+
     const parents =
       organizationIds.length && teacherIds.length
         ? await Parent.find({
@@ -1194,11 +1499,23 @@ const getRelatedRoleData = async (user, roleData) => {
           }).lean()
         : [];
 
+    // Get children against parents
+    const parentIds = uniqueNumbers(
+      parents.map((parent) => parent.parentId)
+    );
+
+    const children = parentIds.length
+      ? await Child.find({
+          parentId: { $in: parentIds },
+        }).lean()
+      : [];
+
     return {
       admins: withCount(admins),
       organizations: withCount(organizations),
       teachers: withCount(teachers),
       parents: withCount(parents),
+      children: withCount(children),
     };
   }
 
@@ -1212,6 +1529,7 @@ const getRelatedRoleData = async (user, roleData) => {
         organizations: withCount([]),
         teachers: withCount([]),
         parents: withCount([]),
+        children: withCount([]),
       };
     }
 
@@ -1223,6 +1541,7 @@ const getRelatedRoleData = async (user, roleData) => {
     const organizationIds = uniqueNumbers(
       organizations.map((org) => org.organizationId)
     );
+
     const organizationAdminIds = uniqueNumbers(
       organizations.map((org) => org.organizationAdminId)
     );
@@ -1243,7 +1562,10 @@ const getRelatedRoleData = async (user, roleData) => {
         }).lean()
       : [];
 
-    const teacherIds = uniqueNumbers(teachers.map((teacher) => teacher.teacherId));
+    const teacherIds = uniqueNumbers(
+      teachers.map((teacher) => teacher.teacherId)
+    );
+
     const parents =
       organizationIds.length && teacherIds.length
         ? await Parent.find({
@@ -1262,16 +1584,27 @@ const getRelatedRoleData = async (user, roleData) => {
           }).lean()
         : [];
 
+    // Get children against parents
+    const parentIds = uniqueNumbers(
+      parents.map((parent) => parent.parentId)
+    );
+
+    const children = parentIds.length
+      ? await Child.find({
+          parentId: { $in: parentIds },
+        }).lean()
+      : [];
+
     return {
       zonalAdmin,
       organizations: withCount(organizations),
       teachers: withCount(teachers),
       parents: withCount(parents),
+      children: withCount(children),
     };
   }
 
   if (user.flag === 1) {
-
     const Admin = await User.findOne({
       userId: roleData.adminId,
     }).lean();
@@ -1281,8 +1614,10 @@ const getRelatedRoleData = async (user, roleData) => {
         organizations: withCount([]),
         teachers: withCount([]),
         parents: withCount([]),
+        children: withCount([]),
       };
     }
+
     const teachers = await Teacher.find({
       $or: [
         {
@@ -1297,7 +1632,10 @@ const getRelatedRoleData = async (user, roleData) => {
       ],
     }).lean();
 
-    const teacherIds = uniqueNumbers(teachers.map((teacher) => teacher.teacherId));
+    const teacherIds = uniqueNumbers(
+      teachers.map((teacher) => teacher.teacherId)
+    );
+
     const parents = teacherIds.length
       ? await Parent.find({
           $or: [
@@ -1315,15 +1653,26 @@ const getRelatedRoleData = async (user, roleData) => {
         }).lean()
       : [];
 
+    // Get children against parents
+    const parentIds = uniqueNumbers(
+      parents.map((parent) => parent.parentId)
+    );
+
+    const children = parentIds.length
+      ? await Child.find({
+          parentId: { $in: parentIds },
+        }).lean()
+      : [];
+
     return {
       Admin,
       teachers: withCount(teachers),
       parents: withCount(parents),
+      children: withCount(children),
     };
   }
 
   if (user.flag === 3) {
-
     const Admin = await User.findOne({
       userId: roleData.adminId,
     }).lean();
@@ -1333,6 +1682,7 @@ const getRelatedRoleData = async (user, roleData) => {
         organizations: withCount([]),
         teachers: withCount([]),
         parents: withCount([]),
+        children: withCount([]),
       };
     }
 
@@ -1345,6 +1695,7 @@ const getRelatedRoleData = async (user, roleData) => {
         organizations: withCount([]),
         teachers: withCount([]),
         parents: withCount([]),
+        children: withCount([]),
       };
     }
 
@@ -1355,7 +1706,10 @@ const getRelatedRoleData = async (user, roleData) => {
       },
     ];
 
-    if (roleData.zonalAdminId !== undefined && roleData.zonalAdminId !== null) {
+    if (
+      roleData.zonalAdminId !== undefined &&
+      roleData.zonalAdminId !== null
+    ) {
       parentFilters.push({
         zonalAdminId: roleData.zonalAdminId,
         adminId: roleData.adminId,
@@ -1368,15 +1722,26 @@ const getRelatedRoleData = async (user, roleData) => {
       $or: parentFilters,
     }).lean();
 
+    // Get children against parents
+    const parentIds = uniqueNumbers(
+      parents.map((parent) => parent.parentId)
+    );
+
+    const children = parentIds.length
+      ? await Child.find({
+          parentId: { $in: parentIds },
+        }).lean()
+      : [];
+
     return {
       Admin,
       organizations,
       parents: withCount(parents),
+      children: withCount(children),
     };
   }
 
   if (user.flag === 2) {
-
     const Admin = await User.findOne({
       userId: roleData.adminId,
     }).lean();
@@ -1386,6 +1751,7 @@ const getRelatedRoleData = async (user, roleData) => {
         organizations: withCount([]),
         teachers: withCount([]),
         parents: withCount([]),
+        children: withCount([]),
       };
     }
 
@@ -1398,6 +1764,7 @@ const getRelatedRoleData = async (user, roleData) => {
         organizations: withCount([]),
         teachers: withCount([]),
         parents: withCount([]),
+        children: withCount([]),
       };
     }
 
@@ -1408,7 +1775,10 @@ const getRelatedRoleData = async (user, roleData) => {
       },
     ];
 
-    if (roleData.zonalAdminId !== undefined && roleData.zonalAdminId !== null) {
+    if (
+      roleData.zonalAdminId !== undefined &&
+      roleData.zonalAdminId !== null
+    ) {
       parentFilters.push({
         zonalAdminId: roleData.zonalAdminId,
         adminId: roleData.adminId,
@@ -1421,16 +1791,27 @@ const getRelatedRoleData = async (user, roleData) => {
       $or: parentFilters,
     }).lean();
 
+    // Get children against parents
+    const parentIds = uniqueNumbers(
+      parents.map((parent) => parent.parentId)
+    );
+
+    const children = parentIds.length
+      ? await Child.find({
+          parentId: { $in: parentIds },
+        }).lean()
+      : [];
+
     return {
       Admin,
       organizations,
       parents: withCount(parents),
+      children: withCount(children),
     };
   }
 
   return null;
 };
-
 export const getUserById = async (userId) => {
   const user = await User.findById(userId).select("-password");
 
