@@ -9,6 +9,7 @@ import Child from "../models/child.model.js";
 import Admin from "../models/admin.model.js";
 import RefreshToken from "../models/refreshToken.model.js";
 import Personalize from "../models/personalize.model.js";
+import Appointment from "../models/appoinment.model.js";
 import mongoose from "mongoose";
 import { OAuth2Client } from "google-auth-library";
 import axios from "axios";
@@ -1510,12 +1511,33 @@ const getRelatedRoleData = async (user, roleData) => {
         }).lean()
       : [];
 
+    // Get appointments against parentId + teacherId
+    const appointmentFilters = parents
+      .map((parent) => ({
+        parentId: parent.parentId,
+        teacherId: parent.teacherId,
+      }))
+      .filter(
+        (item) =>
+          item.parentId !== undefined &&
+          item.parentId !== null &&
+          item.teacherId !== undefined &&
+          item.teacherId !== null
+      );
+
+    const appointments = appointmentFilters.length
+      ? await Appointment.find({
+          $or: appointmentFilters,
+        }).lean()
+      : [];
+
     return {
       admins: withCount(admins),
       organizations: withCount(organizations),
       teachers: withCount(teachers),
       parents: withCount(parents),
       children: withCount(children),
+      appointments: withCount(appointments),
     };
   }
 
@@ -1530,6 +1552,7 @@ const getRelatedRoleData = async (user, roleData) => {
         teachers: withCount([]),
         parents: withCount([]),
         children: withCount([]),
+        appointments: withCount([]),
       };
     }
 
@@ -1595,12 +1618,33 @@ const getRelatedRoleData = async (user, roleData) => {
         }).lean()
       : [];
 
+    // Get appointments against parentId + teacherId
+    const appointmentFilters = parents
+      .map((parent) => ({
+        parentId: parent.parentId,
+        teacherId: parent.teacherId,
+      }))
+      .filter(
+        (item) =>
+          item.parentId !== undefined &&
+          item.parentId !== null &&
+          item.teacherId !== undefined &&
+          item.teacherId !== null
+      );
+
+    const appointments = appointmentFilters.length
+      ? await Appointment.find({
+          $or: appointmentFilters,
+        }).lean()
+      : [];
+
     return {
       zonalAdmin,
       organizations: withCount(organizations),
       teachers: withCount(teachers),
       parents: withCount(parents),
       children: withCount(children),
+      appointments: withCount(appointments),
     };
   }
 
@@ -1615,6 +1659,7 @@ const getRelatedRoleData = async (user, roleData) => {
         teachers: withCount([]),
         parents: withCount([]),
         children: withCount([]),
+        appointments: withCount([]),
       };
     }
 
@@ -1664,11 +1709,32 @@ const getRelatedRoleData = async (user, roleData) => {
         }).lean()
       : [];
 
+    // Get appointments against parentId + teacherId
+    const appointmentFilters = parents
+      .map((parent) => ({
+        parentId: parent.parentId,
+        teacherId: parent.teacherId,
+      }))
+      .filter(
+        (item) =>
+          item.parentId !== undefined &&
+          item.parentId !== null &&
+          item.teacherId !== undefined &&
+          item.teacherId !== null
+      );
+
+    const appointments = appointmentFilters.length
+      ? await Appointment.find({
+          $or: appointmentFilters,
+        }).lean()
+      : [];
+
     return {
       Admin,
       teachers: withCount(teachers),
       parents: withCount(parents),
       children: withCount(children),
+      appointments: withCount(appointments),
     };
   }
 
@@ -1683,6 +1749,7 @@ const getRelatedRoleData = async (user, roleData) => {
         teachers: withCount([]),
         parents: withCount([]),
         children: withCount([]),
+        appointments: withCount([]),
       };
     }
 
@@ -1696,6 +1763,7 @@ const getRelatedRoleData = async (user, roleData) => {
         teachers: withCount([]),
         parents: withCount([]),
         children: withCount([]),
+        appointments: withCount([]),
       };
     }
 
@@ -1733,11 +1801,32 @@ const getRelatedRoleData = async (user, roleData) => {
         }).lean()
       : [];
 
+    // Get appointments against parentId + teacherId
+    const appointmentFilters = parents
+      .map((parent) => ({
+        parentId: parent.parentId,
+        teacherId: parent.teacherId,
+      }))
+      .filter(
+        (item) =>
+          item.parentId !== undefined &&
+          item.parentId !== null &&
+          item.teacherId !== undefined &&
+          item.teacherId !== null
+      );
+
+    const appointments = appointmentFilters.length
+      ? await Appointment.find({
+          $or: appointmentFilters,
+        }).lean()
+      : [];
+
     return {
       Admin,
       organizations,
       parents: withCount(parents),
       children: withCount(children),
+      appointments: withCount(appointments),
     };
   }
 
@@ -1752,6 +1841,7 @@ const getRelatedRoleData = async (user, roleData) => {
         teachers: withCount([]),
         parents: withCount([]),
         children: withCount([]),
+        appointments: withCount([]),
       };
     }
 
@@ -1765,9 +1855,32 @@ const getRelatedRoleData = async (user, roleData) => {
         teachers: withCount([]),
         parents: withCount([]),
         children: withCount([]),
+        appointments: withCount([]),
       };
     }
 
+    // Get teacher
+    const teacher = await Teacher.findOne({
+      teacherId: roleData.teacherId,
+    }).lean();
+
+    // Get teacher's User data
+    let teacherWithUserData = null;
+
+    if (teacher) {
+      const userData = await User.findOne({
+        userId: teacher.userId,
+      })
+        .select("-password")
+        .lean();
+
+      teacherWithUserData = {
+        ...teacher,
+        userData,
+      };
+    }
+
+    // Get parents assigned to this teacher
     const parentFilters = [
       {
         organizationId: roleData.organizationId,
@@ -1802,14 +1915,35 @@ const getRelatedRoleData = async (user, roleData) => {
         }).lean()
       : [];
 
+    // Get appointments against parentId + teacherId
+    const appointmentFilters = parents
+      .map((parent) => ({
+        parentId: parent.parentId,
+        teacherId: parent.teacherId,
+      }))
+      .filter(
+        (item) =>
+          item.parentId !== undefined &&
+          item.parentId !== null &&
+          item.teacherId !== undefined &&
+          item.teacherId !== null
+      );
+
+    const appointments = appointmentFilters.length
+      ? await Appointment.find({
+          $or: appointmentFilters,
+        }).lean()
+      : [];
+
     return {
       Admin,
       organizations,
+      teacher: teacherWithUserData,
       parents: withCount(parents),
       children: withCount(children),
+      appointments: withCount(appointments),
     };
   }
-
   return null;
 };
 export const getUserById = async (userId) => {
@@ -1977,6 +2111,29 @@ export const getAllUsersService = async (flag, options = {}) => {
       }
 
       const relatedData = await getRelatedRoleData(user, roleData);
+      if (relatedData?.admins?.data) {
+        relatedData.admins.data = await enrichWithUserData(
+          relatedData.admins.data
+        );
+      }
+
+      if (relatedData?.organizations?.data) {
+        relatedData.organizations.data = await enrichWithUserData(
+          relatedData.organizations.data
+        );
+      }
+
+      if (relatedData?.teachers?.data) {
+        relatedData.teachers.data = await enrichWithUserData(
+          relatedData.teachers.data
+        );
+      }
+
+      if (relatedData?.parents?.data) {
+        relatedData.parents.data = await enrichWithUserData(
+          relatedData.parents.data
+        );
+      }
 
       return {
         ...user,
