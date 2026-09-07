@@ -8,6 +8,7 @@ import Teacher from "../models/teachers.model.js";
 import OrganizationAdmin from "../models/organizationAdmin.model.js";
 import ZonalAdmin from "../models/zonalAdmin.model.js";
 import Admin from "../models/admin.model.js";
+import children from "../models/child.model.js";
 
 export const createAppointment = async (data) => {
   const availability = await Availability.findOne({
@@ -204,9 +205,19 @@ export const getAppointments = async ({
 
   let enrichedAppointments = await Promise.all(
     appointments.map(async (appointment) => {
-      const [teacher, parent] = await Promise.all([
-        Teacher.findOne({ userId: appointment.teacherId }).lean(),
-        Parent.findOne({ userId: appointment.parentId }).lean(),
+      const [teacher, parent, childDetails] = await Promise.all([
+        Teacher.findOne({
+          userId: appointment.teacherId,
+        }).lean(),
+
+        Parent.findOne({
+          userId: appointment.parentId,
+        }).lean(),
+
+        // Get all children against parent's parentId
+        children.find({
+          parentId: appointment.parentId,
+        }).lean(),
       ]);
 
       let teacherUser = null;
@@ -215,6 +226,7 @@ export const getAppointments = async ({
       let zonalAdmin = null;
       let admin = null;
 
+      // ================= TEACHER USER =================
       if (teacher) {
         teacherUser = await User.findOne({
           userId: teacher.userId,
@@ -223,6 +235,7 @@ export const getAppointments = async ({
           .lean();
       }
 
+      // ================= PARENT USERS =================
       if (parent) {
         [
           parentUser,
@@ -230,19 +243,27 @@ export const getAppointments = async ({
           zonalAdmin,
           admin,
         ] = await Promise.all([
-          User.findOne({ userId: parent.userId })
+          User.findOne({
+            userId: parent.userId,
+          })
             .select("-password")
             .lean(),
 
-          User.findOne({ userId: parent.organizationId })
+          User.findOne({
+            userId: parent.organizationId,
+          })
             .select("-password")
             .lean(),
 
-          User.findOne({ userId: parent.zonalAdminId })
+          User.findOne({
+            userId: parent.zonalAdminId,
+          })
             .select("-password")
             .lean(),
 
-          User.findOne({ userId: parent.adminId })
+          User.findOne({
+            userId: parent.adminId,
+          })
             .select("-password")
             .lean(),
         ]);
@@ -250,10 +271,16 @@ export const getAppointments = async ({
 
       return {
         ...appointment,
+
         teacher,
         teacherUser,
+
         parent,
         parentUser,
+
+        // ================= CHILDREN =================
+        childDetails,
+
         organization,
         zonalAdmin,
         admin,
@@ -274,6 +301,9 @@ export const getAppointments = async ({
         item.admin?.name,
         item.status,
         item.date,
+
+        // Search children names too
+        ...(item.childDetails || []).map((child) => child.name),
       ]
         .filter(Boolean)
         .some((value) =>
@@ -345,18 +375,6 @@ export const getAppointments = async ({
   return enrichedAppointments;
 };
 
-
-// export const getAppointmentById = async (id) => {
-//   const appointment = await Appointment.findById(id);
-//   if (!appointment) {
-//     const error = new Error("Appointment not found");
-//     error.statusCode = 404;
-//     throw error;
-//   }
-//   return appointment;
-// };
-
-
 export const getAppointmentById = async (id) => {
   const appointment = await Appointment.findById(id).lean();
 
@@ -364,9 +382,21 @@ export const getAppointmentById = async (id) => {
     return null;
   }
 
-  const [teacher, parent] = await Promise.all([
-    Teacher.findOne({ userId: appointment.teacherId }).lean(),
-    Parent.findOne({ userId: appointment.parentId }).lean(),
+  const [teacher, parent, childDetails] = await Promise.all([
+    Teacher.findOne({
+      userId: appointment.teacherId,
+    }).lean(),
+
+    Parent.findOne({
+      userId: appointment.parentId,
+    }).lean(),
+
+    // Get all children belonging to this parent
+    children
+      .find({
+        parentId: appointment.parentId,
+      })
+      .lean(),
   ]);
 
   let teacherUser = null;
@@ -392,19 +422,27 @@ export const getAppointmentById = async (id) => {
       zonalAdmin,
       admin,
     ] = await Promise.all([
-      User.findOne({ userId: parent.userId })
+      User.findOne({
+        userId: parent.userId,
+      })
         .select("-password")
         .lean(),
 
-      User.findOne({ userId: parent.organizationId })
+      User.findOne({
+        userId: parent.organizationId,
+      })
         .select("-password")
         .lean(),
 
-      User.findOne({ userId: parent.zonalAdminId })
+      User.findOne({
+        userId: parent.zonalAdminId,
+      })
         .select("-password")
         .lean(),
 
-      User.findOne({ userId: parent.adminId })
+      User.findOne({
+        userId: parent.adminId,
+      })
         .select("-password")
         .lean(),
     ]);
@@ -412,10 +450,16 @@ export const getAppointmentById = async (id) => {
 
   return {
     ...appointment,
+
     teacher,
     teacherUser,
+
     parent,
     parentUser,
+
+    // ================= CHILDREN =================
+    childDetails,
+
     organization,
     zonalAdmin,
     admin,
