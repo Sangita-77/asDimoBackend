@@ -346,14 +346,80 @@ export const getAppointments = async ({
 };
 
 
+// export const getAppointmentById = async (id) => {
+//   const appointment = await Appointment.findById(id);
+//   if (!appointment) {
+//     const error = new Error("Appointment not found");
+//     error.statusCode = 404;
+//     throw error;
+//   }
+//   return appointment;
+// };
+
+
 export const getAppointmentById = async (id) => {
-  const appointment = await Appointment.findById(id);
+  const appointment = await Appointment.findById(id).lean();
+
   if (!appointment) {
-    const error = new Error("Appointment not found");
-    error.statusCode = 404;
-    throw error;
+    return null;
   }
-  return appointment;
+
+  const [teacher, parent] = await Promise.all([
+    Teacher.findOne({ userId: appointment.teacherId }).lean(),
+    Parent.findOne({ userId: appointment.parentId }).lean(),
+  ]);
+
+  let teacherUser = null;
+  let parentUser = null;
+  let organization = null;
+  let zonalAdmin = null;
+  let admin = null;
+
+  // ================= TEACHER =================
+  if (teacher) {
+    teacherUser = await User.findOne({
+      userId: teacher.userId,
+    })
+      .select("-password")
+      .lean();
+  }
+
+  // ================= PARENT =================
+  if (parent) {
+    [
+      parentUser,
+      organization,
+      zonalAdmin,
+      admin,
+    ] = await Promise.all([
+      User.findOne({ userId: parent.userId })
+        .select("-password")
+        .lean(),
+
+      User.findOne({ userId: parent.organizationId })
+        .select("-password")
+        .lean(),
+
+      User.findOne({ userId: parent.zonalAdminId })
+        .select("-password")
+        .lean(),
+
+      User.findOne({ userId: parent.adminId })
+        .select("-password")
+        .lean(),
+    ]);
+  }
+
+  return {
+    ...appointment,
+    teacher,
+    teacherUser,
+    parent,
+    parentUser,
+    organization,
+    zonalAdmin,
+    admin,
+  };
 };
 
 export const confirmAppointment = async (id) => {
@@ -435,6 +501,7 @@ export const rescheduleAppointment = async (id, data) => {
   appointment.availabilityId = availability._id;
   appointment.zoomLink = availability.zoomLink;
   appointment.status = "rescheduled";
+  appointment.reason = data.reason || appointment.reason;
 
   await appointment.save();
 
@@ -524,7 +591,7 @@ export const rescheduleAppointment = async (id, data) => {
   return appointment;
 };
 
-export const cancelAppointment = async (id) => {
+export const cancelAppointment = async (id , data) => {
   const appointment = await Appointment.findById(id);
   if (!appointment) {
     const error = new Error("Appointment not found");
@@ -532,6 +599,7 @@ export const cancelAppointment = async (id) => {
     throw error;
   }
   appointment.status = "cancelled";
+  appointment.reason = data.reason || appointment.reason;
   await appointment.save();
   await Availability.findOneAndUpdate(
     { userId: appointment.teacherId, date: appointment.date, time: appointment.time },

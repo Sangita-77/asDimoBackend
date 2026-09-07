@@ -62,12 +62,12 @@ export const confirmAppointment = asyncHandler(async (req, res) => {
 });
 
 export const rescheduleAppointment = asyncHandler(async (req, res) => {
-  const {date , time } = req.body;
+  const {date , time , reason } = req.body;
 
-  if (!date || !time) {
+  if (!date || !time || !reason) {
     return res.status(400).json({
       success: false,
-      message: "Please provide all required fields: date, time",
+      message: "Please provide all required fields: date, time, reason",
     });
   }
   const appointment = await appointmentsService.rescheduleAppointment(req.params.id, req.body);
@@ -79,7 +79,16 @@ export const rescheduleAppointment = asyncHandler(async (req, res) => {
 });
 
 export const cancelAppointment = asyncHandler(async (req, res) => {
-  const appointment = await appointmentsService.cancelAppointment(req.params.id);
+  const {reason } = req.body;
+
+    if (!reason) {
+    return res.status(400).json({
+      success: false,
+      message: "Please provide all required fields: reason",
+    });
+  }
+
+  const appointment = await appointmentsService.cancelAppointment(req.params.id , req.body);
   res.status(200).json({
     success: true,
     message: "Appointment cancelled successfully",

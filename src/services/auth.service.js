@@ -1433,9 +1433,86 @@ const applySearchAndSort = (users, options = {}) => {
 // };
 ////////////////////////////////////////////////////////
 
+const enrichWithUserData = async (items = []) => {
+  if (!Array.isArray(items)) return [];
+  return Promise.all(
+    items.map(async (item) => {
+      if (!item) return item;
+      if (item.userData) return item;
+
+      const targetUserId =
+        item.userId ??
+        item.adminId ??
+        item.zonalAdminId ??
+        item.teacherId ??
+        item.parentId ??
+        item.organizationAdminId;
+
+      const userData = targetUserId
+        ? await User.findOne({
+            userId: targetUserId,
+          })
+            .select("-password")
+            .lean()
+        : null;
+
+      return {
+        ...item,
+        userData: userData || null,
+      };
+    })
+  );
+};
+
+const enrichSingleWithUserData = async (item) => {
+  if (!item) return null;
+  if (item.userData) return item;
+
+  const targetUserId =
+    item.userId ??
+    item.adminId ??
+    item.zonalAdminId ??
+    item.teacherId ??
+    item.parentId ??
+    item.organizationAdminId;
+
+  const userData = targetUserId
+    ? await User.findOne({
+        userId: targetUserId,
+      })
+        .select("-password")
+        .lean()
+    : null;
+
+  return {
+    ...item,
+    userData: userData || null,
+  };
+};
+
 const getRelatedRoleData = async (user, roleData) => {
   if (!roleData || Object.keys(roleData).length === 0) {
     return null;
+  }
+
+  if (user.flag === 0) {
+    const zonalAdmins = await ZonalAdmin.find({}).lean();
+    const admins = await Admin.find({}).lean();
+    const organizations = await OrganizationAdmin.find({}).lean();
+    const teachers = await Teacher.find({}).lean();
+    const parents = await Parent.find({}).lean();
+    const children = await Child.find({}).lean();
+    const appointments = await Appointment.find({}).lean();
+
+    return {
+      zonalAdmins: withCount(zonalAdmins),
+      admins: withCount(admins),
+      organizations: withCount(organizations),
+      teachers: withCount(teachers),
+      parents: withCount(parents),
+      children: withCount(children),
+      appointments: withCount(appointments),
+    };
   }
 
   if (user.flag === 6) {
@@ -1542,12 +1619,43 @@ const getRelatedRoleData = async (user, roleData) => {
   }
 
   if (user.flag === 7) {
-    const zonalAdmin = await User.findOne({
-      userId: roleData.zonalAdminId,
+    const zonalAdminDoc = await ZonalAdmin.findOne({
+      $or: [
+        { zonalAdminId: roleData.zonalAdminId },
+        { userId: roleData.zonalAdminId },
+      ],
     }).lean();
+
+    let zonalAdmin = null;
+    if (zonalAdminDoc) {
+      const userData = await User.findOne({
+        userId: zonalAdminDoc.userId,
+      })
+        .select("-password")
+        .lean();
+
+      zonalAdmin = {
+        ...zonalAdminDoc,
+        userData,
+      };
+    } else if (roleData.zonalAdminId) {
+      const userData = await User.findOne({
+        userId: roleData.zonalAdminId,
+      })
+        .select("-password")
+        .lean();
+
+      if (userData) {
+        zonalAdmin = {
+          userId: roleData.zonalAdminId,
+          userData,
+        };
+      }
+    }
 
     if (!zonalAdmin) {
       return {
+        zonalAdmin: null,
         organizations: withCount([]),
         teachers: withCount([]),
         parents: withCount([]),
@@ -1649,13 +1757,44 @@ const getRelatedRoleData = async (user, roleData) => {
   }
 
   if (user.flag === 1) {
-    const Admin = await User.findOne({
-      userId: roleData.adminId,
+    const adminDoc = await Admin.findOne({
+      $or: [
+        { adminId: roleData.adminId },
+        { userId: roleData.adminId },
+      ],
     }).lean();
 
-    if (!Admin) {
+    let admin = null;
+    if (adminDoc) {
+      const userData = await User.findOne({
+        userId: adminDoc.userId,
+      })
+        .select("-password")
+        .lean();
+
+      admin = {
+        ...adminDoc,
+        userData,
+      };
+    } else if (roleData.adminId) {
+      const userData = await User.findOne({
+        userId: roleData.adminId,
+      })
+        .select("-password")
+        .lean();
+
+      if (userData) {
+        admin = {
+          userId: roleData.adminId,
+          userData,
+        };
+      }
+    }
+
+    if (!admin) {
       return {
-        organizations: withCount([]),
+        Admin: null,
+        admin: null,
         teachers: withCount([]),
         parents: withCount([]),
         children: withCount([]),
@@ -1730,7 +1869,8 @@ const getRelatedRoleData = async (user, roleData) => {
       : [];
 
     return {
-      Admin,
+      Admin: admin,
+      admin,
       teachers: withCount(teachers),
       parents: withCount(parents),
       children: withCount(children),
@@ -1738,33 +1878,74 @@ const getRelatedRoleData = async (user, roleData) => {
     };
   }
 
-  if (user.flag === 3) {
-    const Admin = await User.findOne({
-      userId: roleData.adminId,
+  if (user.flag === 3 || user.flag === 5) {
+    const adminDoc = await Admin.findOne({
+      $or: [
+        { adminId: roleData.adminId },
+        { userId: roleData.adminId },
+      ],
     }).lean();
 
-    if (!Admin) {
-      return {
-        organizations: withCount([]),
-        teachers: withCount([]),
-        parents: withCount([]),
-        children: withCount([]),
-        appointments: withCount([]),
+    let admin = null;
+    if (adminDoc) {
+      const userData = await User.findOne({
+        userId: adminDoc.userId,
+      })
+        .select("-password")
+        .lean();
+
+      admin = {
+        ...adminDoc,
+        userData,
       };
+    } else if (roleData.adminId) {
+      const userData = await User.findOne({
+        userId: roleData.adminId,
+      })
+        .select("-password")
+        .lean();
+
+      if (userData) {
+        admin = {
+          userId: roleData.adminId,
+          userData,
+        };
+      }
     }
 
-    const organizations = await User.findOne({
-      userId: roleData.organizationId,
+    const orgDoc = await OrganizationAdmin.findOne({
+      $or: [
+        { organizationId: roleData.organizationId },
+        { organizationAdminId: roleData.organizationId },
+        { userId: roleData.organizationId },
+      ],
     }).lean();
 
-    if (!organizations) {
-      return {
-        organizations: withCount([]),
-        teachers: withCount([]),
-        parents: withCount([]),
-        children: withCount([]),
-        appointments: withCount([]),
+    let organization = null;
+    if (orgDoc) {
+      const userData = await User.findOne({
+        userId: orgDoc.userId,
+      })
+        .select("-password")
+        .lean();
+
+      organization = {
+        ...orgDoc,
+        userData,
       };
+    } else if (roleData.organizationId) {
+      const userData = await User.findOne({
+        userId: roleData.organizationId,
+      })
+        .select("-password")
+        .lean();
+
+      if (userData) {
+        organization = {
+          userId: roleData.organizationId,
+          userData,
+        };
+      }
     }
 
     const parentFilters = [
@@ -1822,62 +2003,119 @@ const getRelatedRoleData = async (user, roleData) => {
       : [];
 
     return {
-      Admin,
-      organizations,
+      Admin: admin,
+      admin,
+      organizations: organization,
+      organization,
       parents: withCount(parents),
       children: withCount(children),
       appointments: withCount(appointments),
     };
   }
 
-  if (user.flag === 2) {
-    const Admin = await User.findOne({
-      userId: roleData.adminId,
+  if (user.flag === 2 || user.flag === 4) {
+    const adminDoc = await Admin.findOne({
+      $or: [
+        { adminId: roleData.adminId },
+        { userId: roleData.adminId },
+      ],
     }).lean();
 
-    if (!Admin) {
-      return {
-        organizations: withCount([]),
-        teachers: withCount([]),
-        parents: withCount([]),
-        children: withCount([]),
-        appointments: withCount([]),
+    let admin = null;
+    if (adminDoc) {
+      const userData = await User.findOne({
+        userId: adminDoc.userId,
+      })
+        .select("-password")
+        .lean();
+
+      admin = {
+        ...adminDoc,
+        userData,
       };
+    } else if (roleData.adminId) {
+      const userData = await User.findOne({
+        userId: roleData.adminId,
+      })
+        .select("-password")
+        .lean();
+
+      if (userData) {
+        admin = {
+          userId: roleData.adminId,
+          userData,
+        };
+      }
     }
 
-    const organizations = await User.findOne({
-      userId: roleData.organizationId,
+    const orgDoc = await OrganizationAdmin.findOne({
+      $or: [
+        { organizationId: roleData.organizationId },
+        { organizationAdminId: roleData.organizationId },
+        { userId: roleData.organizationId },
+      ],
     }).lean();
 
-    if (!organizations) {
-      return {
-        organizations: withCount([]),
-        teachers: withCount([]),
-        parents: withCount([]),
-        children: withCount([]),
-        appointments: withCount([]),
+    let organization = null;
+    if (orgDoc) {
+      const userData = await User.findOne({
+        userId: orgDoc.userId,
+      })
+        .select("-password")
+        .lean();
+
+      organization = {
+        ...orgDoc,
+        userData,
       };
+    } else if (roleData.organizationId) {
+      const userData = await User.findOne({
+        userId: roleData.organizationId,
+      })
+        .select("-password")
+        .lean();
+
+      if (userData) {
+        organization = {
+          userId: roleData.organizationId,
+          userData,
+        };
+      }
     }
 
     // Get teacher
-    const teacher = await Teacher.findOne({
-      teacherId: roleData.teacherId,
+    const teacherDoc = await Teacher.findOne({
+      $or: [
+        { teacherId: roleData.teacherId },
+        { userId: roleData.teacherId },
+      ],
     }).lean();
 
-    // Get teacher's User data
     let teacherWithUserData = null;
-
-    if (teacher) {
+    if (teacherDoc) {
       const userData = await User.findOne({
-        userId: teacher.userId,
+        userId: teacherDoc.userId,
       })
         .select("-password")
         .lean();
 
       teacherWithUserData = {
-        ...teacher,
+        ...teacherDoc,
         userData,
       };
+    } else if (roleData.teacherId) {
+      const userData = await User.findOne({
+        userId: roleData.teacherId,
+      })
+        .select("-password")
+        .lean();
+
+      if (userData) {
+        teacherWithUserData = {
+          userId: roleData.teacherId,
+          userData,
+        };
+      }
     }
 
     // Get parents assigned to this teacher
@@ -1936,8 +2174,10 @@ const getRelatedRoleData = async (user, roleData) => {
       : [];
 
     return {
-      Admin,
-      organizations,
+      Admin: admin,
+      admin,
+      organizations: organization,
+      organization,
       teacher: teacherWithUserData,
       parents: withCount(parents),
       children: withCount(children),
@@ -1977,6 +2217,36 @@ export const getUserById = async (userId) => {
   } 
 
   const relatedData = await getRelatedRoleData(user, roleData);
+
+  if (relatedData?.zonalAdmins?.data) {
+    relatedData.zonalAdmins.data = await enrichWithUserData(
+      relatedData.zonalAdmins.data
+    );
+  }
+
+  if (relatedData?.admins?.data) {
+    relatedData.admins.data = await enrichWithUserData(
+      relatedData.admins.data
+    );
+  }
+
+  if (relatedData?.organizations?.data) {
+    relatedData.organizations.data = await enrichWithUserData(
+      relatedData.organizations.data
+    );
+  }
+
+  if (relatedData?.teachers?.data) {
+    relatedData.teachers.data = await enrichWithUserData(
+      relatedData.teachers.data
+    );
+  }
+
+  if (relatedData?.parents?.data) {
+    relatedData.parents.data = await enrichWithUserData(
+      relatedData.parents.data
+    );
+  }
 
   return {
     user,
@@ -2069,6 +2339,13 @@ export const getAllUsersService = async (flag, options = {}) => {
       let roleData = null;
 
       switch (user.flag) {
+        case 0:
+          roleData =
+            await SuperAdmin.findOne({
+              userId: user.userId,
+            }).lean();
+          break;
+
         case 1:
           roleData =
             await OrganizationAdmin.findOne({
@@ -2111,6 +2388,13 @@ export const getAllUsersService = async (flag, options = {}) => {
       }
 
       const relatedData = await getRelatedRoleData(user, roleData);
+
+      if (relatedData?.zonalAdmins?.data) {
+        relatedData.zonalAdmins.data = await enrichWithUserData(
+          relatedData.zonalAdmins.data
+        );
+      }
+
       if (relatedData?.admins?.data) {
         relatedData.admins.data = await enrichWithUserData(
           relatedData.admins.data
@@ -2132,6 +2416,46 @@ export const getAllUsersService = async (flag, options = {}) => {
       if (relatedData?.parents?.data) {
         relatedData.parents.data = await enrichWithUserData(
           relatedData.parents.data
+        );
+      }
+
+      if (relatedData?.zonalAdmin && !relatedData.zonalAdmin.userData) {
+        relatedData.zonalAdmin = await enrichSingleWithUserData(
+          relatedData.zonalAdmin
+        );
+      }
+
+      if (relatedData?.Admin && !relatedData.Admin.userData) {
+        relatedData.Admin = await enrichSingleWithUserData(
+          relatedData.Admin
+        );
+      }
+
+      if (relatedData?.admin && !relatedData.admin.userData) {
+        relatedData.admin = await enrichSingleWithUserData(
+          relatedData.admin
+        );
+      }
+
+      if (
+        relatedData?.organizations &&
+        !relatedData.organizations.data &&
+        !relatedData.organizations.userData
+      ) {
+        relatedData.organizations = await enrichSingleWithUserData(
+          relatedData.organizations
+        );
+      }
+
+      if (relatedData?.organization && !relatedData.organization.userData) {
+        relatedData.organization = await enrichSingleWithUserData(
+          relatedData.organization
+        );
+      }
+
+      if (relatedData?.teacher && !relatedData.teacher.userData) {
+        relatedData.teacher = await enrichSingleWithUserData(
+          relatedData.teacher
         );
       }
 
@@ -2991,23 +3315,6 @@ export const resetPasswordWithOTP = async (email, otp, newPassword) => {
   return { success: true, message: "Password updated successfully" };
 };
 
-const enrichWithUserData = async (items = []) => {
-  return Promise.all(
-    items.map(async (item) => {
-      const userData = await User.findOne({
-        userId: item.userId,
-      })
-        .select("-password")
-        .lean();
-
-      return {
-        ...item,
-        userData,
-      };
-    })
-  );
-};
-
 export const getAllUsersServiceById = async (userId) => {
   const user = await User.findOne({ userId })
     .select("-password")
@@ -3022,6 +3329,12 @@ export const getAllUsersServiceById = async (userId) => {
   let roleData = null;
 
   switch (user.flag) {
+    case 0:
+      roleData = await SuperAdmin.findOne({
+        userId: user.userId,
+      }).lean();
+      break;
+
     case 1:
       roleData = await OrganizationAdmin.findOne({
         userId: user.userId,
@@ -3060,6 +3373,12 @@ export const getAllUsersServiceById = async (userId) => {
 
   const relatedData = await getRelatedRoleData(user, roleData);
 
+  if (relatedData?.zonalAdmins?.data) {
+    relatedData.zonalAdmins.data = await enrichWithUserData(
+      relatedData.zonalAdmins.data
+    );
+  }
+
   if (relatedData?.admins?.data) {
     relatedData.admins.data = await enrichWithUserData(
       relatedData.admins.data
@@ -3081,6 +3400,46 @@ export const getAllUsersServiceById = async (userId) => {
   if (relatedData?.parents?.data) {
     relatedData.parents.data = await enrichWithUserData(
       relatedData.parents.data
+    );
+  }
+
+  if (relatedData?.zonalAdmin && !relatedData.zonalAdmin.userData) {
+    relatedData.zonalAdmin = await enrichSingleWithUserData(
+      relatedData.zonalAdmin
+    );
+  }
+
+  if (relatedData?.Admin && !relatedData.Admin.userData) {
+    relatedData.Admin = await enrichSingleWithUserData(
+      relatedData.Admin
+    );
+  }
+
+  if (relatedData?.admin && !relatedData.admin.userData) {
+    relatedData.admin = await enrichSingleWithUserData(
+      relatedData.admin
+    );
+  }
+
+  if (
+    relatedData?.organizations &&
+    !relatedData.organizations.data &&
+    !relatedData.organizations.userData
+  ) {
+    relatedData.organizations = await enrichSingleWithUserData(
+      relatedData.organizations
+    );
+  }
+
+  if (relatedData?.organization && !relatedData.organization.userData) {
+    relatedData.organization = await enrichSingleWithUserData(
+      relatedData.organization
+    );
+  }
+
+  if (relatedData?.teacher && !relatedData.teacher.userData) {
+    relatedData.teacher = await enrichSingleWithUserData(
+      relatedData.teacher
     );
   }
 

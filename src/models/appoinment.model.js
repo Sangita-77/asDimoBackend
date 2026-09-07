@@ -38,6 +38,11 @@ const appoinmentSchema = new mongoose.Schema(
         enum: ["pending", "approved", "rejected", "cancelled" , "rescheduled" , "completed"],
         default: "pending",
       },
+
+      reason: {
+        type: String,
+        required: true,
+      },
   
       zoomLink: String,
     },

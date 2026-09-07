@@ -889,42 +889,109 @@ Response example:
 
 ---
 
-## Payment APIs
+## Payment APIs (Razorpay)
 
-### POST /payments/create-intent
-Create payment intent.
+### GET /payments/key
+Get the Razorpay public Key ID for client checkout.
+
+Response:
+```json
+{
+  "success": true,
+  "message": "Razorpay key retrieved successfully",
+  "data": {
+    "key": "rzp_test_..."
+  }
+}
+```
+
+### POST /payments/create-order
+Create a Razorpay order before opening the payment modal in React. Requires authentication.
 
 Request body example:
 ```json
 {
   "amount": 1999,
-  "currency": "INR"
+  "currency": "INR",
+  "receipt": "rcpt_12345",
+  "notes": {
+    "planName": "Premium Plan",
+    "userId": "67b9d5c8..."
+  }
 }
 ```
 
-### POST /payments/webhook
-Receive payment webhook events.
+Response:
+```json
+{
+  "success": true,
+  "message": "Razorpay order created successfully",
+  "data": {
+    "orderId": "order_P123456789",
+    "amount": 199900,
+    "amountInRupees": 1999,
+    "currency": "INR",
+    "receipt": "rcpt_12345",
+    "razorpayKeyId": "rzp_test_...",
+    "paymentDbId": "67b9d...",
+    "paymentId": 1
+  }
+}
+```
 
-Body depends on provider.
-
-### GET /payments
-List payments.
-
-### GET /payments/:id
-Get payment.
-
-### POST /payments/refund/:id
-Request refund.
+### POST /payments/verify-payment
+Verify the cryptographic signature returned by Razorpay Checkout in React. Requires authentication.
 
 Request body example:
 ```json
 {
-  "reason": "Customer request"
+  "razorpay_order_id": "order_P123456789",
+  "razorpay_payment_id": "pay_P987654321",
+  "razorpay_signature": "9ef28c8942b088b9177..."
+}
+```
+
+Response:
+```json
+{
+  "success": true,
+  "message": "Payment verified successfully",
+  "data": {
+    "verified": true,
+    "payment": {
+      "_id": "67b9d...",
+      "orderId": "order_P123456789",
+      "razorpayPaymentId": "pay_P987654321",
+      "amount": 1999,
+      "currency": "INR",
+      "status": "completed"
+    }
+  }
+}
+```
+
+### POST /payments/webhook
+Receive and process Razorpay webhook events (e.g. `payment.captured`, `payment.failed`, `refund.processed`).
+
+### GET /payments
+List all payments (supports `?status=completed` and `?userId=...` filters). Requires authentication.
+
+### GET /payments/:id
+Get payment details by MongoDB `_id`, auto-increment `paymentId`, or Razorpay `orderId`. Requires authentication.
+
+### POST /payments/refund/:id
+Process refund via Razorpay and update record. Requires authentication.
+
+Request body example:
+```json
+{
+  "amount": 1999,
+  "reason": "Customer cancellation"
 }
 ```
 
 ### GET /payments/reports
-Get payment reports.
+Get payment metrics and status breakdown. Requires authentication.
 
 ---
 

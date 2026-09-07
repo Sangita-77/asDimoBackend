@@ -181,11 +181,14 @@ router.use("/subscriptions", subscriptionsRouter);
 
 const paymentsRouter = Router();
 
+paymentsRouter.get("/key", paymentsController.getRazorpayKey);
+paymentsRouter.post("/create-order", authenticate, protect, paymentsController.createRazorpayOrder);
+paymentsRouter.post("/verify-payment", authenticate, protect, paymentsController.verifyRazorpayPayment);
 paymentsRouter.post("/webhook", paymentsController.handlePaymentWebhook);
 paymentsRouter.get("/", authenticate, protect, paymentsController.getPayments);
+paymentsRouter.get("/reports", authenticate, protect, paymentsController.getPaymentReports);
 paymentsRouter.get("/:id", authenticate, protect, paymentsController.getPaymentById);
 paymentsRouter.post("/refund/:id", authenticate, protect, paymentsController.refundPayment);
-paymentsRouter.get("/reports", authenticate, protect, paymentsController.getPaymentReports);
 router.use("/payments", paymentsRouter);
 
 const analyticsRouter = Router();

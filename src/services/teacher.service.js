@@ -54,84 +54,223 @@ export const addAvailabilityservice = async (userId, date, time, medium) => {
 };
 
 
+// export const getAvailabilityWTSer = async () => {
+//   const data = await Availability.aggregate([
+//     {
+//       $lookup: {
+//         from: "users", 
+//         localField: "userId",
+//         foreignField: "userId",
+//         as: "userDetails"
+//       }
+//     },
+//     {
+//       $unwind: {
+//         path: "$userDetails",
+//         preserveNullAndEmptyArrays: true
+//       }
+//     },
+//     {
+//       $lookup: {
+//         from: "teachers",
+//         localField: "userId",
+//         foreignField: "userId",
+//         as: "teacherDetails"
+//       }
+//     },
+//     {
+//       $unwind: {
+//         path: "$teacherDetails",
+//         preserveNullAndEmptyArrays: true
+//       }
+//     },
+//     {
+//       $lookup: {
+//         from: "organizationadmins",
+//         localField: "teacherDetails.organizationId",
+//         foreignField: "organizationId",
+//         as: "organizationDetails"
+//       }
+//     },
+//     {
+//       $unwind: {
+//         path: "$organizationDetails",
+//         preserveNullAndEmptyArrays: true
+//       }
+//     },
+//     {
+//       $addFields: {
+//         isGlobalTeacher: {
+//           $cond: [
+//             { $eq: ["$teacherDetails.organizationId", null] },
+//             true,
+//             false
+//           ]
+//         }
+//       }
+//     },
+//     {
+//       $project: {
+//         __v : 0,
+//         _id : 0,
+//         createdAt : 0,
+//         updatedAt : 0,
+//         "userDetails._id": 0, 
+//         "userDetails.password": 0, 
+//         "userDetails.__v": 0,
+//         "userDetails.createdAt": 0,
+//         "userDetails.updatedAt": 0,
+
+//         "teacherDetails._id": 0,
+//         "teacherDetails.__v": 0,
+//         "teacherDetails.createdAt": 0,
+//         "teacherDetails.updatedAt": 0,
+
+//         "organizationDetails._id": 0,
+//         "organizationDetails.__v": 0,
+//         "organizationDetails.createdAt": 0,
+//         "organizationDetails.updatedAt": 0
+//       }
+//     }
+//   ]);
+
+//   return data;
+// };
+
+
 export const getAvailabilityWTSer = async () => {
   const data = await Availability.aggregate([
+    // =====================================================
+    // GET AVAILABILITY USER DETAILS
+    // =====================================================
     {
       $lookup: {
-        from: "users", 
+        from: "users",
         localField: "userId",
         foreignField: "userId",
-        as: "userDetails"
-      }
+        as: "userDetails",
+      },
     },
+
     {
       $unwind: {
         path: "$userDetails",
-        preserveNullAndEmptyArrays: true
-      }
+        preserveNullAndEmptyArrays: true,
+      },
     },
+
+    // =====================================================
+    // GET TEACHER DETAILS
+    // =====================================================
     {
       $lookup: {
         from: "teachers",
         localField: "userId",
         foreignField: "userId",
-        as: "teacherDetails"
-      }
+        as: "teacherDetails",
+      },
     },
+
     {
       $unwind: {
         path: "$teacherDetails",
-        preserveNullAndEmptyArrays: true
-      }
+        preserveNullAndEmptyArrays: true,
+      },
     },
+
+    // =====================================================
+    // GET TEACHER USER DETAILS
+    // teacherDetails.teacherId == users.userId
+    // =====================================================
+    {
+      $lookup: {
+        from: "users",
+        localField: "teacherDetails.teacherId",
+        foreignField: "userId",
+        as: "teacherUserDetails",
+      },
+    },
+
+    {
+      $unwind: {
+        path: "$teacherUserDetails",
+        preserveNullAndEmptyArrays: true,
+      },
+    },
+
+    // =====================================================
+    // GET ORGANIZATION DETAILS
+    // =====================================================
     {
       $lookup: {
         from: "organizationadmins",
         localField: "teacherDetails.organizationId",
         foreignField: "organizationId",
-        as: "organizationDetails"
-      }
+        as: "organizationDetails",
+      },
     },
+
     {
       $unwind: {
         path: "$organizationDetails",
-        preserveNullAndEmptyArrays: true
-      }
+        preserveNullAndEmptyArrays: true,
+      },
     },
+
+    // =====================================================
+    // GLOBAL TEACHER
+    // =====================================================
     {
       $addFields: {
         isGlobalTeacher: {
           $cond: [
-            { $eq: ["$teacherDetails.organizationId", null] },
+            {
+              $eq: ["$teacherDetails.organizationId", null],
+            },
             true,
-            false
-          ]
-        }
-      }
+            false,
+          ],
+        },
+      },
     },
+
+    // =====================================================
+    // REMOVE UNWANTED FIELDS
+    // =====================================================
     {
       $project: {
-        __v : 0,
-        _id : 0,
-        createdAt : 0,
-        updatedAt : 0,
-        "userDetails._id": 0, 
-        "userDetails.password": 0, 
+        __v: 0,
+        _id: 0,
+        createdAt: 0,
+        updatedAt: 0,
+
+        // Availability user
+        "userDetails._id": 0,
+        "userDetails.password": 0,
         "userDetails.__v": 0,
         "userDetails.createdAt": 0,
         "userDetails.updatedAt": 0,
 
+        // Teacher
         "teacherDetails._id": 0,
         "teacherDetails.__v": 0,
         "teacherDetails.createdAt": 0,
         "teacherDetails.updatedAt": 0,
 
+        // Teacher's User
+        "teacherUserDetails._id": 0,
+        "teacherUserDetails.password": 0,
+        "teacherUserDetails.__v": 0,
+        "teacherUserDetails.createdAt": 0,
+        "teacherUserDetails.updatedAt": 0,
+
+        // Organization
         "organizationDetails._id": 0,
         "organizationDetails.__v": 0,
         "organizationDetails.createdAt": 0,
-        "organizationDetails.updatedAt": 0
-      }
-    }
+        "organizationDetails.updatedAt": 0,
+      },
+    },
   ]);
 
   return data;

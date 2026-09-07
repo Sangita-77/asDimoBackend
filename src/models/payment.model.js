@@ -7,6 +7,27 @@ const paymentSchema = new mongoose.Schema(
       unique: true,
       index: true,
     },
+    user: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "User",
+      default: null,
+    },
+    orderId: {
+      type: String,
+      index: true,
+      sparse: true,
+    },
+    razorpayPaymentId: {
+      type: String,
+      index: true,
+      sparse: true,
+    },
+    razorpaySignature: {
+      type: String,
+    },
+    receipt: {
+      type: String,
+    },
     amount: {
       type: Number,
       required: true,
@@ -21,7 +42,18 @@ const paymentSchema = new mongoose.Schema(
       enum: ["pending", "completed", "failed", "refunded"],
       default: "pending",
     },
+    provider: {
+      type: String,
+      default: "razorpay",
+    },
     providerId: String,
+    notes: {
+      type: Map,
+      of: String,
+    },
+    refundId: String,
+    refundReason: String,
+    refundAmount: Number,
     metadata: mongoose.Schema.Types.Mixed,
   },
   { timestamps: true }
