@@ -1,3820 +1,809 @@
-import User from "../models/user.model.js";
-import Parent from "../models/parents.model.js";
-import Teacher from "../models/teachers.model.js";
-import SuperAdmin from "../models/superAdmin.model.js";
-import OrganizationAdmin from "../models/organizationAdmin.model.js";
-import BlacklistLog from "../models/blacklistLog.model.js";
-import ZonalAdmin from "../models/zonalAdmin.model.js";
-import Child from "../models/child.model.js";
-import Admin from "../models/admin.model.js";
-import RefreshToken from "../models/refreshToken.model.js";
-import Personalize from "../models/personalize.model.js";
-import Appointment from "../models/appoinment.model.js";
-import mongoose from "mongoose";
-import { OAuth2Client } from "google-auth-library";
-import axios from "axios";
 import {
-  generateAccessToken,
-  generateRefreshToken,
-  verifyRefreshToken,
-} from "../utils/jwt.js";
-import { sendEmail } from "../utils/sendEmail.js";
-// import { generateSessionId } from "../utils/session.js";
-import { sendNotification } from "./notifications.service.js";
-import { env } from "../config/env.js";
+  registerUser,
+  loginUser,
+  loginWithGoogle,
+  loginWithFacebook,
+  getUserById,
+  getAllUsersService,
+  logoutUser,
+  refreshAuthToken,
+  updateUserService,
+  updateProfileById,
+  deleteUsersService,
+  verifyEmailAndSendOTP,
+  validateOTP,
+  resetPasswordWithOTP,
+  getAllUsersServiceById,
+  getAllUsersByRelationService,
+  addChildInformationService,
+  saveQuestionAnswerService,
+  getQuestionAnswerService,
+  updateQuestionAnswerService,
+  updateUserRelationService,
+} from "../services/auth.service.js";
+import {
+  sendEmailOtp,
+  validateEmailOtp,
+} from "../services/emailOtp.service.js";
+import { asyncHandler } from "../utils/asyncHandler.js";
+import OrganizationAdmin from "../models/organizationAdmin.model.js";
 
 
-const generateRandomPassword = (length = 8) => {
-  const chars =
-    "ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz23456789";
-  let password = "";
-  for (let i = 0; i < length; i++) {
-    password += chars.charAt(Math.floor(Math.random() * chars.length));
+export const register = asyncHandler(async (req, res) => {
+  const {
+    name,
+    email,
+    flag,
+    referralCode,
+    organizationId,
+    organization_type,
+    superAdminId,
+    zonalAdminId,
+    adminId,
+    organizationAdminId,
+    therapistId,
+    teacherId,
+    city,
+    state,
+    pincode,
+    address,
+    phone,
+    country,
+    org_name,
+    therapist_category,
+  } = req.body;
+
+  // console.log("BODY =>", req.body);
+  // console.log("FILE =>", req.file);
+
+  const profileImg = req.file
+  ? `/uploads/profile/${req.file.filename}`
+  : null;
+
+  if (!name || !email || flag === undefined || flag === null) {
+    return res.status(400).json({
+      success: false,
+      message: "Please provide name, email, and flag",
+    });
   }
-  return password;
-};
 
-const getTokenExpiryDate = (token) => {
-  const decoded = JSON.parse(Buffer.from(token.split(".")[1], "base64url").toString("utf8"));
-  return new Date(decoded.exp * 1000);
-};
+  const numericFlag = Number(flag);
 
-const createRefreshTokenRecord = async (userId, userObjectId) => {
-  const refreshToken = generateRefreshToken(userId);
+  const therapistCategories = [
+    "Psychologist",
+    "speech therapist",
+    "special educator",
+    "operational therapist",
+  ];
 
-  await RefreshToken.create({
-    token: refreshToken,
-    user: userObjectId,
-    expiresAt: getTokenExpiryDate(refreshToken),
+  if (
+    [3, 5].includes(numericFlag) &&
+    !therapistCategories.includes(therapist_category)
+  ) {
+    return res.status(400).json({
+      success: false,
+      message:
+        "therapist_category is required for Therapist and Global Therapist and must be Psychologist, speech therapist, special educator, or operational therapist",
+    });
+  }
+
+  if (numericFlag === 6 && (!superAdminId || !city || !state || !pincode || !address)) {
+    return res.status(400).json({
+      success: false,
+      message: "superAdminId and full address are required for Zonal Admin",
+    });
+  }
+
+  if (numericFlag === 7 && (!zonalAdminId || !city || !state || !pincode || !address)) {
+    return res.status(400).json({
+      success: false,
+      message: "zonalAdminId and full address are required for Admin",
+    });
+  }
+
+  if (numericFlag === 1 && (!adminId || !city || !state || !pincode || !address)) {
+    return res.status(400).json({
+      success: false,
+      message: "adminId and full address are required for Organization Admin",
+    });
+  }
+
+  if (numericFlag === 5 && !adminId) {
+    return res.status(400).json({
+      success: false,
+      message: "adminId is required for Global Therapist",
+    });
+  }
+
+  // organization_type mandatory for OrganizationAdmin
+  if (numericFlag === 1 && organization_type === undefined) {
+    return res.status(400).json({
+      success: false,
+      message: "organization_type is required for Organization Admin",
+    });
+  }
+
+  // Validate organization_type value
+  if (numericFlag === 1 && ![0, 1].includes(Number(organization_type))) {
+    return res.status(400).json({
+      success: false,
+      message: "organization_type must be 0 (Clinic) or 1 (School)",
+    });
+  }
+
+  if (numericFlag === 3 && !organizationAdminId && !organizationId) {
+    return res.status(400).json({
+      success: false,
+      message: "organizationAdminId is required for Therapist",
+    });
+  }
+
+  if (
+    numericFlag === 2 &&
+    !therapistId &&
+    !teacherId &&
+    !referralCode
+  ) {
+    return res.status(400).json({
+      success: false,
+      message: "therapistId or referralCode is required for Parent",
+    });
+  }
+
+  // const { user, generatedPassword, role } = await registerUser({
+  //   name,
+  //   email,
+  //   flag,
+  //   organizationId,
+  //   organization_type,
+  //   address
+  // });
+
+  let generatedOrgName = org_name;
+
+  if (numericFlag === 5) {
+    // First 3 letters of name
+    const prefix = name
+      .trim()
+      .substring(0, 3)
+      .toUpperCase();
+
+    // Find last generated org_name
+    const lastOrg = await OrganizationAdmin.findOne({
+      org_name: { $regex: `^${prefix}_` },
+    }).sort({ org_name: -1 });
+
+    let nextNumber = 1;
+
+    if (lastOrg) {
+      const lastSequence = parseInt(lastOrg.org_name.split("_")[1]) || 0;
+      nextNumber = lastSequence + 1;
+    }
+
+    generatedOrgName = `${prefix}_${String(nextNumber).padStart(3, "0")}`;
+  }
+
+  if (numericFlag === 1) {
+    generatedOrgName = name;
+  }
+
+  const { user, generatedPassword, role } = await registerUser({
+    name,
+    email,
+    flag,
+    referralCode,
+    organizationId,
+    organization_type,
+    address,
+    phone,
+    country,
+    superAdminId,
+    zonalAdminId,
+    adminId,
+    organizationAdminId,
+    therapistId,
+    teacherId,
+    city,
+    state,
+    pincode,
+    profileImg,
+    org_name: generatedOrgName,
+    therapist_category,
   });
 
-  return refreshToken;
-};
-
-const toPositiveNumber = (value, fieldName) => {
-  const number = Number(value);
-  if (!Number.isFinite(number) || number <= 0) {
-    const error = new Error(`Invalid ${fieldName}`);
-    error.statusCode = 400;
-    throw error;
-  }
-  return number;
-};
-
-const requireField = (value, fieldName, roleName) => {
-  if (value === undefined || value === null || value === "") {
-    const error = new Error(`${fieldName} is required for ${roleName}`);
-    error.statusCode = 400;
-    throw error;
-  }
-};
-
-const getRoleParents = async (flag, userData) => {
-  const parents = {};
-
-  if (flag === 6) {
-    requireField(userData.superAdminId, "superAdminId", "Zonal Admin");
-    const superAdminId = toPositiveNumber(userData.superAdminId, "superAdminId");
-    const superAdmin = await SuperAdmin.findOne({ adminId: superAdminId });
-    if (!superAdmin) {
-      const error = new Error("Super Admin not found with given superAdminId");
-      error.statusCode = 404;
-      throw error;
-    }
-    parents.superAdmin = superAdmin;
-  }
-
-  if (flag === 7) {
-    requireField(userData.zonalAdminId, "zonalAdminId", "Admin");
-    const zonalAdminId = toPositiveNumber(userData.zonalAdminId, "zonalAdminId");
-    const zonalAdmin = await ZonalAdmin.findOne({ zonalAdminId });
-    if (!zonalAdmin) {
-      const error = new Error("Zonal Admin not found with given zonalAdminId");
-      error.statusCode = 404;
-      throw error;
-    }
-    parents.zonalAdmin = zonalAdmin;
-  }
-
-  if (flag === 1 || flag === 5) {
-    requireField(
-      userData.adminId,
-      "adminId",
-      flag === 5 ? "Global Therapist" : "Organization Admin"
-    );
-    const adminId = toPositiveNumber(userData.adminId, "adminId");
-    const admin = await Admin.findOne({ adminId });
-    if (!admin) {
-      const error = new Error("Admin not found with given adminId");
-      error.statusCode = 404;
-      throw error;
-    }
-    parents.admin = admin;
-  }
-
-  if (flag === 3) {
-    const orgAdminLookup = userData.organizationAdminId ?? userData.organizationId;
-    requireField(orgAdminLookup, "organizationAdminId", "Therapist");
-    const organizationAdminId = toPositiveNumber(orgAdminLookup, "organizationAdminId");
-    const organizationAdmin = await OrganizationAdmin.findOne({
-      $or: [{ organizationAdminId }, { organizationId: organizationAdminId }],
-    });
-    if (!organizationAdmin) {
-      const error = new Error("Organization Admin not found with given organizationAdminId");
-      error.statusCode = 404;
-      throw error;
-    }
-    parents.organizationAdmin = organizationAdmin;
-  }
-
-  if (flag === 2) {
-    const therapistLookup = userData.therapistId ?? userData.teacherId;
-    requireField(therapistLookup, "therapistId", "Parent");
-    const therapistId = toPositiveNumber(therapistLookup, "therapistId");
-    const therapist = await Teacher.findOne({ teacherId: therapistId });
-    if (!therapist) {
-      const error = new Error("Therapist not found with given therapistId");
-      error.statusCode = 404;
-      throw error;
-    }
-    parents.therapist = therapist;
-
-    const organizationLookup = [];
-    if (therapist.organizationAdminId !== undefined && therapist.organizationAdminId !== null) {
-      organizationLookup.push({ organizationAdminId: therapist.organizationAdminId });
-    }
-    if (therapist.organizationId !== undefined && therapist.organizationId !== null) {
-      organizationLookup.push({ organizationId: therapist.organizationId });
-    }
-
-    const organizationAdmin = organizationLookup.length
-      ? await OrganizationAdmin.findOne({ $or: organizationLookup })
-      : null;
-
-    if (therapist.organizationId && !organizationAdmin) {
-      const error = new Error("Organization Admin not found for given therapistId");
-      error.statusCode = 404;
-      throw error;
-    }
-
-    parents.organizationAdmin = organizationAdmin;
-  }
-
-  return parents;
-};
-
-const generateReferralCode = (length = 6) => {
-  const chars = "ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789";
-  let code = "";
-
-  for (let i = 0; i < length; i++) {
-    code += chars.charAt(
-      Math.floor(Math.random() * chars.length)
-    );
-  }
-
-  return code;
-};
-
-
-export const registerUser = async (userData) => {
-
-  // return userData;
-  // Check if user already exists
-  const existingUser = await User.findOne({ email: userData.email });
-  if (existingUser) {
-    const error = new Error("User with this email already exists");
-    error.statusCode = 400;
-    throw error;
-  }
-
-  let referralCode;
-  let exists;
-
-  do {
-    referralCode = generateReferralCode(6);
-
-    exists = await User.findOne({
-      referralCode,
-    });
-  } while (exists);
-
-  try {
-    const generatedPassword = generateRandomPassword();
-
-    const flag = Number(userData.flag);
-
-    // If referralCode provided for Parent (flag === 2), map referring user to required parent fields
-    if (flag === 2 && userData.referralCode) {
-      const refUser = await User.findOne({ referralCode: userData.referralCode });
-      if (!refUser) {
-        const error = new Error("Invalid referralCode: user not found");
-        error.statusCode = 404;
-        throw error;
-      }
-
-      const refFlag = Number(refUser.flag);
-
-      // If referring user is an Organization Admin, attach organizationAdminId and organizationId
-      if (refFlag === 1) {
-        userData.organizationAdminId = refUser.userId;
-        userData.organizationId = refUser.userId;
-      }
-
-      // If referring user is a Teacher or special OrganizationAdmin (flag 3 or 5), treat as therapist/teacher
-      if (refFlag === 3 || refFlag === 5) {
-        userData.therapistId = refUser.userId;
-        userData.teacherId = refUser.userId;
-
-        // Try to resolve organization admin info to derive adminId / zonalAdminId
-        let orgAdmin = null;
-
-        if (refFlag === 3) {
-          const teacherDoc = await Teacher.findOne({ teacherId: refUser.userId });
-          if (teacherDoc) {
-            const orgLookup = [];
-            if (teacherDoc.organizationAdminId !== undefined && teacherDoc.organizationAdminId !== null) {
-              orgLookup.push({ organizationAdminId: teacherDoc.organizationAdminId });
-            }
-            if (teacherDoc.organizationId !== undefined && teacherDoc.organizationId !== null) {
-              orgLookup.push({ organizationId: teacherDoc.organizationId });
-            }
-            if (orgLookup.length) {
-              orgAdmin = await OrganizationAdmin.findOne({ $or: orgLookup });
-            }
-            // If teacherDoc itself has admin/zonal info, prefer that
-            if (!orgAdmin) {
-              if (teacherDoc.adminId || teacherDoc.zonalAdminId) {
-                orgAdmin = {
-                  adminId: teacherDoc.adminId ?? null,
-                  zonalAdminId: teacherDoc.zonalAdminId ?? null,
-                  organizationAdminId: teacherDoc.organizationAdminId ?? null,
-                  organizationId: teacherDoc.organizationId ?? null,
-                };
-              }
-            }
-          }
-        } else if (refFlag === 5) {
-          orgAdmin = await OrganizationAdmin.findOne({
-            $or: [{ organizationAdminId: refUser.userId }, { organizationId: refUser.userId }],
-          });
-        }
-
-        if (orgAdmin) {
-          userData.adminId = orgAdmin.adminId ?? userData.adminId;
-          userData.zonalAdminId = orgAdmin.zonalAdminId ?? userData.zonalAdminId;
-          userData.organizationAdminId = orgAdmin.organizationAdminId ?? orgAdmin.organizationId ?? userData.organizationAdminId;
-          userData.organizationId = orgAdmin.organizationId ?? userData.organizationId;
-        }
-      }
-    }
-
-
-    if (flag === 1) {
-      requireField(userData.organization_type, "organization_type", "Organization Admin");
-      if (![0, 1].includes(Number(userData.organization_type))) {
-        const error = new Error("organization_type must be 0 (Clinic) or 1 (School)");
-        error.statusCode = 400;
-        throw error;
-      }
-    }
-
-    const parents = await getRoleParents(flag, userData);
-
-    // Use transaction when available; fallback to manual rollback if transactions are not supported
-    const session = await mongoose.startSession();
-    let user;
-    let roleDoc;
-
-    try {
-      await session.withTransaction(async () => {
-        user = await User.create(
-          [
-            {
-              name: userData.name,
-              email: userData.email,
-              flag,
-              password: generatedPassword,
-              referralCode,
-              status: 1,
-              city : userData.city,
-              state : userData.state,
-              pincode : userData.pincode,
-              address : userData.address,
-              phone : userData.phone,
-              country : userData.country,
-              profileImg: userData.profileImg,
-              org_name: userData.org_name,
-            },
-          ],
-          { session }
-        );
-        user = user[0];
-        // user = await User.findById(user._id);
-        user = await User.findById(user._id).session(session);
-        // await user.save({ session });
-        // console.log("Created user:", {
-        //   _id: user._id,
-        //   userId: user.userId,
-        // });
-
-        // Create role-specific "table"
-        if (flag === 0) {
-          roleDoc = await SuperAdmin.create(
-            [
-              {
-                adminId: user.userId,
-                userId: user.userId,
-                user: user._id,
-              },
-            ],
-            { session }
-          );
-          roleDoc = roleDoc[0];
-        } else if (flag === 1) {
-          roleDoc = await OrganizationAdmin.create(
-            [
-              {
-                organizationAdminId: user.userId,
-                userId: user.userId,
-                user: user._id,
-                // for OrganizationAdmin, organizationId is this same user's userId
-                organizationId: user.userId,
-                adminId: parents.admin.adminId,
-                organization_type: Number(userData.organization_type),
-                zonalAdminId: parents.admin.zonalAdminId,
-                city : userData.city,
-                state : userData.state,
-                pincode : userData.pincode,
-                address : userData.address,
-                country : userData.country,
-                phone : userData.phone,
-              },
-            ],
-            { session }
-          );
-          roleDoc = roleDoc[0];
-        } else if (flag === 2 || flag === 4) {
-          roleDoc = await Parent.create(
-            [
-              {
-                parentId: user.userId,
-                userId: user.userId,
-                user: user._id,
-                organizationId: flag === 2 ? parents.therapist.organizationId : null,
-                organizationAdminId:
-                  flag === 2 ? parents.therapist.organizationAdminId : null,
-                zonalAdminId:
-                  flag === 2
-                    ? parents.therapist.zonalAdminId ??
-                      parents.organizationAdmin?.zonalAdminId
-                    : null,
-                adminId:
-                  flag === 2
-                    ? parents.therapist.adminId ?? parents.organizationAdmin?.adminId
-                    : null,
-                therapistId: flag === 2 ? parents.therapist.teacherId : null,
-                teacherId: flag === 2 ? parents.therapist.teacherId : null,
-              },
-            ],
-            { session }
-          );
-          roleDoc = roleDoc[0];
-        } else if (flag === 3) {
-          roleDoc = await Teacher.create(
-            [
-              {
-                teacherId: user.userId,
-                userId: user.userId,
-                user: user._id,
-                organizationId: parents.organizationAdmin.organizationId,
-                organizationAdminId: parents.organizationAdmin.organizationAdminId,
-                zonalAdminId: parents.organizationAdmin.zonalAdminId,
-                adminId: parents.organizationAdmin.adminId,
-                therapist_category: userData.therapist_category,
-              },
-            ],
-            { session }
-          );
-          roleDoc = roleDoc[0];
-        } else if (flag === 5) {
-          // A global therapist is also its own organization.  Use the newly
-          // created user's numeric ID for both organization identifiers, then
-          // use those exact values on the therapist record.
-          const organizationAdmin = await OrganizationAdmin.create(
-            [
-              {
-                organizationAdminId: user.userId,
-                organizationId: user.userId,
-                userId: user.userId,
-                user: user._id,
-                zonalAdminId: parents.admin.zonalAdminId,
-                adminId: parents.admin.adminId,
-                organization_type: userData.organization_type ?? null,
-                city : userData.city,
-                state : userData.state,
-                pincode : userData.pincode,
-                address : userData.address,
-                country : userData.country,
-                phone : userData.phone,
-              },
-            ],
-            { session }
-          );
-
-          roleDoc = await Teacher.create(
-            [
-              {
-                teacherId: user.userId,
-                userId: user.userId,
-                user: user._id,
-                organizationId: organizationAdmin[0].organizationId,
-                organizationAdminId: organizationAdmin[0].organizationAdminId,
-                zonalAdminId: organizationAdmin[0].zonalAdminId,
-                adminId: organizationAdmin[0].adminId,
-                therapist_category: userData.therapist_category,
-              },
-            ],
-            { session }
-          );
-          roleDoc = roleDoc[0];
-        } else if (flag === 6) {
-          roleDoc = await ZonalAdmin.create(
-            [
-              {
-                zonalAdminId: user.userId,
-                userId: user.userId,
-                user: user._id,
-                superAdminId: userData.superAdminId,
-                // superAdminId: parents.superAdmin.adminId,
-                city : userData.city,
-                state : userData.state,
-                pincode : userData.pincode,
-                address : userData.address,
-                phone : userData.phone,
-                country : userData.country,
-              },
-            ],
-            { session }
-          );
-          roleDoc = roleDoc[0];
-        } else if (flag === 7) {
-          roleDoc = await Admin.create(
-            [
-              {
-                adminId: user.userId,
-                userId: user.userId,
-                user: user._id,
-                zonalAdminId: parents.zonalAdmin.zonalAdminId,
-                city: userData.city,
-                state: userData.state,
-                pincode: userData.pincode,
-                address: userData.address,
-                phone: userData.phone,
-                country: userData.country,
-                status: 1,
-              },
-            ],
-            { session }
-          );
-          roleDoc = roleDoc[0];
-        } else {
-          const error = new Error("Invalid flag value");
-          error.statusCode = 400;
-          throw error;
-        }
-      });
-    } catch (txErr) {
-      // If transactions are not supported (e.g., standalone Mongo), do a best-effort rollback flow
-      if (
-        typeof txErr?.message === "string" &&
-        (txErr.message.includes("Transaction") ||
-          txErr.message.includes("replica set") ||
-          txErr.message.includes("not supported"))
-      ) {
-        // Create user first
-        user = await User.create({
-          name: userData.name,
-          email: userData.email,
-          flag,
-          password: generatedPassword,
-          status: 1,
-          city : userData.city,
-          state : userData.state,
-          pincode : userData.pincode,
-          address : userData.address,
-          phone : userData.phone,
-          country : userData.country,
-        });
-
-        try {
-          if (flag === 0) {
-            roleDoc = await SuperAdmin.create({
-              adminId: user.userId,
-              userId: user.userId,
-              user: user._id,
-            });
-          } else if (flag === 1) {
-            roleDoc = await OrganizationAdmin.create({
-              organizationAdminId: user.userId,
-              userId: user.userId,
-              user: user._id,
-              organizationId: user.userId,
-              adminId: parents.admin.adminId,
-              organization_type: Number(userData.organization_type),
-              zonalAdminId: parents.admin.zonalAdminId,
-              city : userData.city,
-              state : userData.state,
-              pincode : userData.pincode,
-              address : userData.address,
-              phone : userData.phone,
-              country : userData.country,
-            });
-          }else if (flag === 2 || flag === 4) {
-            roleDoc = await Parent.create({
-              parentId: user.userId,
-              userId: user.userId,
-              user: user._id,
-              organizationId: flag === 2 ? parents.therapist.organizationId : null,
-              organizationAdminId:
-                flag === 2 ? parents.therapist.organizationAdminId : null,
-              zonalAdminId:
-                flag === 2
-                  ? parents.therapist.zonalAdminId ??
-                    parents.organizationAdmin?.zonalAdminId
-                  : null,
-              adminId:
-                flag === 2
-                  ? parents.therapist.adminId ?? parents.organizationAdmin?.adminId
-                  : null,
-              therapistId: flag === 2 ? parents.therapist.teacherId : null,
-              teacherId: flag === 2 ? parents.therapist.teacherId : null,
-            });
-          } else if (flag === 3) {
-            roleDoc = await Teacher.create({
-              teacherId: user.userId,
-              userId: user.userId,
-              user: user._id,
-              organizationId: flag === 3 ? parents.organizationAdmin.organizationId : null,
-              organizationAdminId: flag === 3 ? parents.organizationAdmin.organizationAdminId : null,
-              zonalAdminId: flag === 3 ? parents.organizationAdmin.zonalAdminId : null,
-              adminId: flag === 3 ? parents.organizationAdmin.adminId : null,
-              therapist_category: userData.therapist_category,
-            });
-          } else if (flag === 5) {
-            const organizationAdmin = await OrganizationAdmin.create({
-              organizationAdminId: user.userId,
-              organizationId: user.userId,
-              userId: user.userId,
-              user: user._id,
-              zonalAdminId: parents.admin.zonalAdminId,
-              adminId: parents.admin.adminId,
-              organization_type: userData.organization_type ?? null,
-              city: userData.city,
-              state: userData.state,
-              pincode: userData.pincode,
-              address: userData.address,
-              country: userData.country,
-              phone: userData.phone,
-            });
-
-            roleDoc = await Teacher.create(
-              {
-                teacherId: user.userId,
-                userId: user.userId,
-                user: user._id,
-                organizationId: organizationAdmin.organizationId,
-                organizationAdminId: organizationAdmin.organizationAdminId,
-                zonalAdminId: organizationAdmin.zonalAdminId,
-                adminId: organizationAdmin.adminId,
-                therapist_category: userData.therapist_category,
-              }
-            );
-        } else if (flag === 6) {
-            roleDoc = await ZonalAdmin.create({
-                  zonalAdminId: user.userId,
-                  userId: user.userId,
-                  user: user._id,
-                  superAdminId: parents.superAdmin.adminId,
-                  city : userData.city,
-                  state : userData.state,
-                  pincode : userData.pincode,
-                  address : userData.address,
-                  phone : userData.phone,
-                  country : userData.country,
-                });
-          } else if (flag === 7) {
-            roleDoc = await Admin.create({
-              adminId: user.userId,
-              userId: user.userId,
-              user: user._id,
-              zonalAdminId: parents.zonalAdmin.zonalAdminId,
-              city: userData.city,
-              state: userData.state,
-              pincode: userData.pincode,
-              address: userData.address,
-              phone: userData.phone,
-              country: userData.country,
-              status: 1,
-            });
-          } else {
-            const error = new Error("Invalid flag value");
-            error.statusCode = 400;
-            throw error;
-          }
-        } catch (roleErr) {
-          await User.deleteOne({ _id: user._id });
-          throw roleErr;
-        }
-      } else {
-        throw txErr;
-      }
-    } finally {
-      session.endSession();
-    }
-
-    await sendEmail(
-      userData.email,
-      "Your Account Credentials",
-      `
-        <h2>Welcome ${userData.name}</h2>
-        <p>Your account has been created successfully.</p>
-        <p><strong>Email:</strong> ${userData.email}</p>
-        <p><strong>Password:</strong> ${generatedPassword}</p>
-        <p>Please login and change your password.</p>
-      `
-    );
-
-    await sendNotification({
-      userId: user.userId,
-      title: "Registration Successful",
-      message: `Welcome ${user.name}! Your account has been created successfully.`,
-      metadata: {
-        userId: user.userId,
-        email: user.email,
-        flag: user.flag,
-        role: roleDoc?.constructor?.modelName || null,
-      },
-    });
-
-    // Return user without password, plus the generated password separately
-    const userObject = user.toObject();
-    delete userObject.password;
-    return {
-      user: userObject,
+  res.status(201).json({
+    success: true,
+    message: "User registered successfully",
+    data: {
+      user,
       generatedPassword,
-      role: roleDoc
-        ? { collection: roleDoc.constructor?.modelName, _id: roleDoc._id }
-        : null,
-    };
-  } catch (error) {
-    // Handle Mongoose validation errors
-    if (error.name === "ValidationError") {
-      error.statusCode = 400;
-    }
-    throw error;
-  }
-};
-
-// export const loginUser = async (email, password) => {
-//   // Find user and include password
-//   const user = await User.findOne({ email }).select("+password");
-
-//   if (!user) {
-//     const error = new Error("Invalid email or password");
-//     error.statusCode = 401;
-//     throw error;
-//   }
-
-//   //  CHECK STATUS FIRST
-//   if (user.status !== 1) {
-//     const error = new Error("Your account is inactive. Please contact admin.");
-//     error.statusCode = 403;
-//     throw error;
-//   }
-
-//   // Compare password
-//   const isPasswordValid = await user.comparePassword(password);
-
-//   if (!isPasswordValid) {
-//     const error = new Error("Invalid email or password");
-//     error.statusCode = 401;
-//     throw error;
-//   }
-
-//   const token = generateAccessToken(user._id.toString());
-//   const refreshToken = await createRefreshTokenRecord(user._id.toString(), user._id);
-
-//   // Remove password
-//   const userObject = user.toObject();
-//   delete userObject.password;
-
-//   return { user: userObject, token, accessToken: token, refreshToken };
-// };
-
-
-export const loginUser = async (email, password) => {
-  if (!email || !password) {
-    const error = new Error("Email and password are required");
-    error.statusCode = 400;
-    throw error;
-  }
-
-  const normalizedEmail = email.toLowerCase().trim();
-  const cleanPassword = password.trim();
-
-  // Get user with password
-  const user = await User.findOne({
-    email: normalizedEmail,
-  }).select("+password");
-
-  if (!user) {
-    const error = new Error("Invalid email or password");
-    error.statusCode = 401;
-    throw error;
-  }
-
-  // Check user status
-  if (user.status !== 1) {
-    const error = new Error(
-      "Your account is inactive. Please contact admin."
-    );
-    error.statusCode = 403;
-    throw error;
-  }
-
-  // Compare password
-  const isMatch = await user.comparePassword(cleanPassword);
-
-  if (!isMatch) {
-    const error = new Error("Invalid email or password");
-    error.statusCode = 401;
-    throw error;
-  }
-
-  // Generate JWT Access Token
-  const accessToken = generateAccessToken(user._id.toString());
-
-  // Generate Refresh Token & store in DB
-  const refreshToken = await createRefreshTokenRecord(
-    user._id.toString(),
-    user._id
-  );
-
-  // Update last login time (optional)
-  user.lastLogin = new Date();
-  await user.save();
-
-  // Remove password before returning
-  const userObject = user.toObject();
-  delete userObject.password;
-
-  return {
-    user: userObject,
-    token: accessToken,
-    accessToken,
-    refreshToken,
-  };
-};
-
-export const loginWithGoogle = async (idToken) => {
-  if (typeof idToken !== "string" || !idToken.trim()) {
-    const error = new Error("Google ID token is required");
-    error.statusCode = 400;
-    throw error;
-  }
-
-  if (!Array.isArray(env.GOOGLE_CLIENT_IDS) || env.GOOGLE_CLIENT_IDS.length === 0) {
-    const error = new Error("Google login is not configured");
-    error.statusCode = 503;
-    throw error;
-  }
-
-  let payload;
-  try {
-    const ticket = await googleOAuthClient.verifyIdToken({
-      idToken,
-      audience: env.GOOGLE_CLIENT_IDS,
-    });
-    payload = ticket.getPayload();
-  } catch {
-    const error = new Error("Invalid Google ID token");
-    error.statusCode = 401;
-    throw error;
-  }
-
-  if (!payload?.email || payload.email_verified !== true) {
-    const error = new Error("Google account email is not verified");
-    error.statusCode = 401;
-    throw error;
-  }
-
-  const googleId = payload.sub;
-  if (!googleId) {
-    const error = new Error("Google ID token does not contain a user ID");
-    error.statusCode = 401;
-    throw error;
-  }
-
-  const email = payload.email.toLowerCase().trim();
-  const [userByGoogleId, userByEmail] = await Promise.all([
-    User.findOne({ googleId }).select("+password"),
-    User.findOne({ email }).select("+password"),
-  ]);
-
-  if (userByGoogleId && userByEmail && !userByGoogleId._id.equals(userByEmail._id)) {
-    const error = new Error("This Google account is already linked to another user");
-    error.statusCode = 409;
-    throw error;
-  }
-
-  const user = userByGoogleId || userByEmail;
-
-  if (!user) {
-    const error = new Error("No AsDimo account exists for this Google email");
-    error.statusCode = 404;
-    throw error;
-  }
-
-  if (user.status !== 1) {
-    const error = new Error("Your account is inactive. Please contact admin.");
-    error.statusCode = 403;
-    throw error;
-  }
-
-  // Save only verified identity data from Google's signed ID token. This links
-  // an existing AsDimo account to Google on its first successful Google login.
-  user.googleId = googleId;
-  user.authProvider = "google";
-  user.googleProfile = {
-    name: payload.name || null,
-    picture: payload.picture || null,
-    email,
-  };
-
-  const accessToken = generateAccessToken(user._id.toString());
-  const refreshToken = await createRefreshTokenRecord(
-    user._id.toString(),
-    user._id
-  );
-
-  user.lastLogin = new Date();
-  await user.save();
-
-  const userObject = user.toObject();
-  delete userObject.password;
-
-  return {
-    user: userObject,
-    token: accessToken,
-    accessToken,
-    refreshToken,
-  };
-};
-
-export const loginWithFacebook = async (accessToken) => {
-  if (typeof accessToken !== "string" || !accessToken.trim()) {
-    const error = new Error("Facebook access token is required");
-    error.statusCode = 400;
-    throw error;
-  }
-
-  if (!env.FACEBOOK_APP_ID || !env.FACEBOOK_APP_SECRET) {
-    const error = new Error("Facebook login is not configured");
-    error.statusCode = 503;
-    throw error;
-  }
-
-  const graphBaseUrl = `https://graph.facebook.com/${env.FACEBOOK_GRAPH_API_VERSION}`;
-  const appAccessToken = `${env.FACEBOOK_APP_ID}|${env.FACEBOOK_APP_SECRET}`;
-  let facebookUser;
-  let validatedFacebookId;
-
-  try {
-    const debugResponse = await axios.get(`${graphBaseUrl}/debug_token`, {
-      params: { input_token: accessToken, access_token: appAccessToken },
-    });
-    const tokenData = debugResponse.data?.data;
-
-    if (!tokenData?.is_valid || String(tokenData.app_id) !== env.FACEBOOK_APP_ID || !tokenData.user_id) {
-      console.warn("Facebook token validation failed", {
-        isValid: tokenData?.is_valid ?? false,
-        hasUserId: Boolean(tokenData?.user_id),
-        belongsToConfiguredApp: String(tokenData?.app_id) === env.FACEBOOK_APP_ID,
-        facebookErrorCode: tokenData?.error?.code,
-        facebookErrorSubcode: tokenData?.error?.error_subcode,
-      });
-      const error = new Error(
-        "Facebook access token is invalid, expired, or belongs to a different Facebook app"
-      );
-      error.statusCode = 401;
-      throw error;
-    }
-    validatedFacebookId = String(tokenData.user_id);
-
-    const profileResponse = await axios.get(`${graphBaseUrl}/me`, {
-      params: {
-        fields: "id,name,email,picture.type(large)",
-        access_token: accessToken,
-      },
-    });
-    facebookUser = profileResponse.data;
-  } catch (caughtError) {
-    if (caughtError.statusCode) {
-      throw caughtError;
-    }
-
-    const facebookError = caughtError.response?.data?.error;
-    console.warn("Facebook token verification request failed", {
-      status: caughtError.response?.status,
-      facebookErrorCode: facebookError?.code,
-      facebookErrorSubcode: facebookError?.error_subcode,
-      facebookErrorType: facebookError?.type,
-    });
-    const error = new Error("Facebook access token could not be verified");
-    error.statusCode = 401;
-    throw error;
-  }
-
-  const facebookId = String(facebookUser?.id || "");
-  if (!facebookId) {
-    const error = new Error("Facebook profile does not contain a user ID");
-    error.statusCode = 401;
-    throw error;
-  }
-
-  if (facebookId !== validatedFacebookId) {
-    const error = new Error("Facebook token profile does not match the validated user");
-    error.statusCode = 401;
-    throw error;
-  }
-
-  const email = typeof facebookUser.email === "string"
-    ? facebookUser.email.toLowerCase().trim()
-    : null;
-  const [userByFacebookId, userByEmail] = await Promise.all([
-    User.findOne({ facebookId }).select("+password"),
-    email ? User.findOne({ email }).select("+password") : null,
-  ]);
-
-  if (userByFacebookId && userByEmail && !userByFacebookId._id.equals(userByEmail._id)) {
-    const error = new Error("This Facebook account is already linked to another user");
-    error.statusCode = 409;
-    throw error;
-  }
-
-  const user = userByFacebookId || userByEmail;
-  if (!user) {
-    const error = new Error(
-      email
-        ? "No AsDimo account exists for this Facebook email"
-        : "Facebook did not provide an email; link Facebook from an existing account first"
-    );
-    error.statusCode = 404;
-    throw error;
-  }
-
-  if (user.status !== 1) {
-    const error = new Error("Your account is inactive. Please contact admin.");
-    error.statusCode = 403;
-    throw error;
-  }
-
-  user.facebookId = facebookId;
-  user.authProvider = "facebook";
-  user.facebookProfile = {
-    name: facebookUser.name || null,
-    picture: facebookUser.picture?.data?.url || null,
-    email,
-  };
-
-  const appJwt = generateAccessToken(user._id.toString());
-  const refreshToken = await createRefreshTokenRecord(user._id.toString(), user._id);
-  user.lastLogin = new Date();
-  await user.save();
-
-  const userObject = user.toObject();
-  delete userObject.password;
-
-  return {
-    user: userObject,
-    token: appJwt,
-    accessToken: appJwt,
-    refreshToken,
-  };
-};
-
-const withCount = (data) => ({
-  count: data.length,
-  data,
+      role,
+    },
+  });
 });
 
-const uniqueNumbers = (values) => [
-  ...new Set(values.filter((value) => value !== undefined && value !== null)),
-];
 
-const getRelatedCount = (item, key) =>
-  item.relatedData?.[key]?.count ?? item.relatedData?.[key]?.data?.length ?? 0;
-
-const normalizeSortOptions = ({ sort, sortBy, sortOrder } = {}) => {
-  const sortText = String(sort ?? "").toLowerCase().trim();
-  const fieldText = String(sortBy ?? "").toLowerCase().trim();
-  const orderText = String(sortOrder ?? "").toLowerCase().trim();
-  const joinedSortText = [sortText, fieldText, orderText].filter(Boolean).join(" ");
-  const compactFieldText = fieldText.replace(/[^a-z0-9]/g, "");
-  const compactSortText = sortText.replace(/[^a-z0-9]/g, "");
-
-  let field = "name";
-  if (["admin", "admins", "admincount", "adminscount"].includes(compactFieldText)) {
-    field = "admin";
-  } else if (
-    [
-      "organization",
-      "organizations",
-      "organisation",
-      "organisations",
-      "org",
-      "orgs",
-      "organizationcount",
-      "organizationscount",
-      "organisationcount",
-      "organisationscount",
-      "orgcount",
-      "orgscount",
-    ].includes(compactFieldText)
-  ) {
-    field = "organizations";
-  } else if (["name", "username"].includes(fieldText)) {
-    field = "name";
-  } else if (
-    compactSortText.includes("organization") ||
-    compactSortText.includes("organisation") ||
-    compactSortText.includes("orgcount")
-  ) {
-    field = "organizations";
-  } else if (compactSortText.includes("admin")) {
-    field = "admin";
-  } else if (compactSortText.includes("name")) {
-    field = "name";
+export const login = asyncHandler(async (req, res) => {
+  const { email, password } = req.body;
+  if (!email || !password) {
+    return res.status(400).json({
+      success: false,
+      message: "Please provide email and password",
+    });
   }
 
-  let direction = orderText || sortText;
-  if (
-    joinedSortText.includes("z-a") ||
-    joinedSortText.includes("za") ||
-    joinedSortText.includes("desc") ||
-    joinedSortText.includes("max-min") ||
-    joinedSortText.includes("max to min")
-  ) {
-    direction = "desc";
-  } else if (
-    joinedSortText.includes("a-z") ||
-    joinedSortText.includes("az") ||
-    joinedSortText.includes("asc") ||
-    joinedSortText.includes("min-max") ||
-    joinedSortText.includes("min to max")
-  ) {
-    direction = "asc";
-  }
+  const { user, token, accessToken, refreshToken } = await loginUser(email, password);
 
-  return {
-    field,
-    direction: direction === "desc" ? "desc" : "asc",
-  };
-};
-
-const getSortableValue = (item, field) => {
-  if (field === "admin") {
-    return getRelatedCount(item, "admins");
-  }
-
-  if (field === "organizations") {
-    return getRelatedCount(item, "organizations");
-  }
-
-  return String(item.name ?? "").toLowerCase();
-};
-
-const searchableText = (item) =>
-  [
-    item.name,
-    item.email,
-    item.userId,
-    item.phone,
-    item.city,
-    item.state,
-    item.country,
-    item.roleData?.city,
-    item.roleData?.state,
-    item.roleData?.country,
-  ]
-    .filter((value) => value !== undefined && value !== null)
-    .join(" ")
-    .toLowerCase();
-
-const applySearchAndSort = (users, options = {}) => {
-  const search = String(options.search ?? "").trim().toLowerCase();
-  const filteredUsers = search
-    ? users.filter((user) => searchableText(user).includes(search))
-    : users;
-
-  if (!options.sort && !options.sortBy && !options.sortOrder) {
-    return filteredUsers;
-  }
-
-  const { field, direction } = normalizeSortOptions(options);
-  const multiplier = direction === "desc" ? -1 : 1;
-
-  return [...filteredUsers].sort((first, second) => {
-    const firstValue = getSortableValue(first, field);
-    const secondValue = getSortableValue(second, field);
-
-    if (typeof firstValue === "number" && typeof secondValue === "number") {
-      return (firstValue - secondValue) * multiplier;
-    }
-
-    return String(firstValue).localeCompare(String(secondValue)) * multiplier;
+  res.status(200).json({
+    success: true,
+    message: "Login successful",
+    data: {
+      user,
+      token,
+      accessToken,
+      refreshToken,
+    },
   });
-};
-///////////////////////// 21/08/2026 ////////////////
-// const getRelatedRoleData = async (user, roleData) => {
-//   if (!roleData || Object.keys(roleData).length === 0) {
-//     return null;
-//   }
+});
 
-//   if (user.flag === 6) {
-//     const admins = await Admin.find({
-//       zonalAdminId: roleData.zonalAdminId,
-//     }).lean();
-//     const adminIds = uniqueNumbers(admins.map((admin) => admin.adminId));
+export const googleLogin = asyncHandler(async (req, res) => {
+  const { idToken } = req.body || {};
 
-//     const organizations = await OrganizationAdmin.find({
-//       zonalAdminId: roleData.zonalAdminId,
-//       ...(adminIds.length ? { adminId: { $in: adminIds } } : {}),
-//     }).lean();
-
-//     const organizationIds = uniqueNumbers(
-//       organizations.map((org) => org.organizationId)
-//     );
-//     const organizationAdminIds = uniqueNumbers(
-//       organizations.map((org) => org.organizationAdminId)
-//     );
-
-//     const teachers = organizationIds.length
-//       ? await Teacher.find({
-//           $or: [
-//             {
-//               zonalAdminId: roleData.zonalAdminId,
-//               adminId: { $in: adminIds },
-//               organizationId: { $in: organizationIds },
-//             },
-//             {
-//               organizationId: { $in: organizationIds },
-//               organizationAdminId: { $in: organizationAdminIds },
-//             },
-//           ],
-//         }).lean()
-//       : [];
-
-//     const teacherIds = uniqueNumbers(teachers.map((teacher) => teacher.teacherId));
-//     const parents =
-//       organizationIds.length && teacherIds.length
-//         ? await Parent.find({
-//             $or: [
-//               {
-//                 zonalAdminId: roleData.zonalAdminId,
-//                 adminId: { $in: adminIds },
-//                 organizationId: { $in: organizationIds },
-//                 teacherId: { $in: teacherIds },
-//               },
-//               {
-//                 organizationId: { $in: organizationIds },
-//                 therapistId: { $in: teacherIds },
-//               },
-//             ],
-//           }).lean()
-//         : [];
-
-//     return {
-//       admins: withCount(admins),
-//       organizations: withCount(organizations),
-//       teachers: withCount(teachers),
-//       parents: withCount(parents),
-//     };
-//   }
-
-//   if (user.flag === 7) {
-//     const zonalAdmin = await User.findOne({
-//       userId: roleData.zonalAdminId,
-//     }).lean();
-
-//     if (!zonalAdmin) {
-//       return {
-//         organizations: withCount([]),
-//         teachers: withCount([]),
-//         parents: withCount([]),
-//       };
-//     }
-
-//     const organizations = await OrganizationAdmin.find({
-//       zonalAdminId: roleData.zonalAdminId,
-//       adminId: roleData.adminId,
-//     }).lean();
-
-//     const organizationIds = uniqueNumbers(
-//       organizations.map((org) => org.organizationId)
-//     );
-//     const organizationAdminIds = uniqueNumbers(
-//       organizations.map((org) => org.organizationAdminId)
-//     );
-
-//     const teachers = organizationIds.length
-//       ? await Teacher.find({
-//           $or: [
-//             {
-//               zonalAdminId: roleData.zonalAdminId,
-//               adminId: roleData.adminId,
-//               organizationId: { $in: organizationIds },
-//             },
-//             {
-//               organizationId: { $in: organizationIds },
-//               organizationAdminId: { $in: organizationAdminIds },
-//             },
-//           ],
-//         }).lean()
-//       : [];
-
-//     const teacherIds = uniqueNumbers(teachers.map((teacher) => teacher.teacherId));
-//     const parents =
-//       organizationIds.length && teacherIds.length
-//         ? await Parent.find({
-//             $or: [
-//               {
-//                 zonalAdminId: roleData.zonalAdminId,
-//                 adminId: roleData.adminId,
-//                 organizationId: { $in: organizationIds },
-//                 teacherId: { $in: teacherIds },
-//               },
-//               {
-//                 organizationId: { $in: organizationIds },
-//                 therapistId: { $in: teacherIds },
-//               },
-//             ],
-//           }).lean()
-//         : [];
-
-//     return {
-//       zonalAdmin,
-//       organizations: withCount(organizations),
-//       teachers: withCount(teachers),
-//       parents: withCount(parents),
-//     };
-//   }
-
-//   if (user.flag === 1) {
-
-//     const Admin = await User.findOne({
-//       userId: roleData.adminId,
-//     }).lean();
-
-//     if (!Admin) {
-//       return {
-//         organizations: withCount([]),
-//         teachers: withCount([]),
-//         parents: withCount([]),
-//       };
-//     }
-//     const teachers = await Teacher.find({
-//       $or: [
-//         {
-//           zonalAdminId: roleData.zonalAdminId,
-//           adminId: roleData.adminId,
-//           organizationId: roleData.organizationId,
-//         },
-//         {
-//           organizationId: roleData.organizationId,
-//           organizationAdminId: roleData.organizationAdminId,
-//         },
-//       ],
-//     }).lean();
-
-//     const teacherIds = uniqueNumbers(teachers.map((teacher) => teacher.teacherId));
-//     const parents = teacherIds.length
-//       ? await Parent.find({
-//           $or: [
-//             {
-//               zonalAdminId: roleData.zonalAdminId,
-//               adminId: roleData.adminId,
-//               organizationId: roleData.organizationId,
-//               teacherId: { $in: teacherIds },
-//             },
-//             {
-//               organizationId: roleData.organizationId,
-//               therapistId: { $in: teacherIds },
-//             },
-//           ],
-//         }).lean()
-//       : [];
-
-//     return {
-//       Admin,
-//       teachers: withCount(teachers),
-//       parents: withCount(parents),
-//     };
-//   }
-
-//   if (user.flag === 3) {
-
-//     const Admin = await User.findOne({
-//       userId: roleData.adminId,
-//     }).lean();
-
-//     if (!Admin) {
-//       return {
-//         organizations: withCount([]),
-//         teachers: withCount([]),
-//         parents: withCount([]),
-//       };
-//     }
-
-//     const organizations = await User.findOne({
-//       userId: roleData.organizationId,
-//     }).lean();
-
-//     if (!organizations) {
-//       return {
-//         organizations: withCount([]),
-//         teachers: withCount([]),
-//         parents: withCount([]),
-//       };
-//     }
-
-//     const parentFilters = [
-//       {
-//         organizationId: roleData.organizationId,
-//         therapistId: roleData.teacherId,
-//       },
-//     ];
-
-//     if (roleData.zonalAdminId !== undefined && roleData.zonalAdminId !== null) {
-//       parentFilters.push({
-//         zonalAdminId: roleData.zonalAdminId,
-//         adminId: roleData.adminId,
-//         organizationId: roleData.organizationId,
-//         teacherId: roleData.teacherId,
-//       });
-//     }
-
-//     const parents = await Parent.find({
-//       $or: parentFilters,
-//     }).lean();
-
-//     return {
-//       Admin,
-//       organizations,
-//       parents: withCount(parents),
-//     };
-//   }
-
-//   if (user.flag === 2) {
-
-//     const Admin = await User.findOne({
-//       userId: roleData.adminId,
-//     }).lean();
-
-//     if (!Admin) {
-//       return {
-//         organizations: withCount([]),
-//         teachers: withCount([]),
-//         parents: withCount([]),
-//       };
-//     }
-
-//     const organizations = await User.findOne({
-//       userId: roleData.organizationId,
-//     }).lean();
-
-//     if (!organizations) {
-//       return {
-//         organizations: withCount([]),
-//         teachers: withCount([]),
-//         parents: withCount([]),
-//       };
-//     }
-
-//     const parentFilters = [
-//       {
-//         organizationId: roleData.organizationId,
-//         therapistId: roleData.teacherId,
-//       },
-//     ];
-
-//     if (roleData.zonalAdminId !== undefined && roleData.zonalAdminId !== null) {
-//       parentFilters.push({
-//         zonalAdminId: roleData.zonalAdminId,
-//         adminId: roleData.adminId,
-//         organizationId: roleData.organizationId,
-//         teacherId: roleData.teacherId,
-//       });
-//     }
-
-//     const parents = await Parent.find({
-//       $or: parentFilters,
-//     }).lean();
-
-//     return {
-//       Admin,
-//       organizations,
-//       parents: withCount(parents),
-//     };
-//   }
-
-//   return null;
-// };
-////////////////////////////////////////////////////////
-
-const enrichWithUserData = async (items = []) => {
-  if (!Array.isArray(items)) return [];
-  return Promise.all(
-    items.map(async (item) => {
-      if (!item) return item;
-      if (item.userData) return item;
-
-      const targetUserId =
-        item.userId ??
-        item.adminId ??
-        item.zonalAdminId ??
-        item.teacherId ??
-        item.parentId ??
-        item.organizationAdminId;
-
-      const userData = targetUserId
-        ? await User.findOne({
-            userId: targetUserId,
-          })
-            .select("-password")
-            .lean()
-        : null;
-
-      return {
-        ...item,
-        userData: userData || null,
-      };
-    })
-  );
-};
-
-const enrichSingleWithUserData = async (item) => {
-  if (!item) return null;
-  if (item.userData) return item;
-
-  const targetUserId =
-    item.userId ??
-    item.adminId ??
-    item.zonalAdminId ??
-    item.teacherId ??
-    item.parentId ??
-    item.organizationAdminId;
-
-  const userData = targetUserId
-    ? await User.findOne({
-        userId: targetUserId,
-      })
-        .select("-password")
-        .lean()
-    : null;
-
-  return {
-    ...item,
-    userData: userData || null,
-  };
-};
-
-const getRelatedRoleData = async (user, roleData) => {
-  if (!roleData || Object.keys(roleData).length === 0) {
-    return null;
+  if (typeof idToken !== "string" || !idToken.trim()) {
+    return res.status(400).json({
+      success: false,
+      message: "Google ID token is required",
+    });
   }
 
-  if (user.flag === 0) {
-    const zonalAdmins = await ZonalAdmin.find({}).lean();
-    const admins = await Admin.find({}).lean();
-    const organizations = await OrganizationAdmin.find({}).lean();
-    const teachers = await Teacher.find({}).lean();
-    const parents = await Parent.find({}).lean();
-    const children = await Child.find({}).lean();
-    const appointments = await Appointment.find({}).lean();
+  const { user, token, accessToken, refreshToken } = await loginWithGoogle(idToken.trim());
 
-    return {
-      zonalAdmins: withCount(zonalAdmins),
-      admins: withCount(admins),
-      organizations: withCount(organizations),
-      teachers: withCount(teachers),
-      parents: withCount(parents),
-      children: withCount(children),
-      appointments: withCount(appointments),
-    };
+  res.status(200).json({
+    success: true,
+    message: "Google login successful",
+    data: { user, token, accessToken, refreshToken },
+  });
+});
+
+export const facebookLogin = asyncHandler(async (req, res) => {
+  const { accessToken } = req.body || {};
+
+  if (typeof accessToken !== "string" || !accessToken.trim()) {
+    return res.status(400).json({
+      success: false,
+      message: "Facebook access token is required",
+    });
   }
 
-  if (user.flag === 6) {
-    const admins = await Admin.find({
-      zonalAdminId: roleData.zonalAdminId,
-    }).lean();
+  const { user, token, accessToken: appAccessToken, refreshToken } =
+    await loginWithFacebook(accessToken.trim());
 
-    const adminIds = uniqueNumbers(
-      admins.map((admin) => admin.adminId)
-    );
+  res.status(200).json({
+    success: true,
+    message: "Facebook login successful",
+    data: { user, token, accessToken: appAccessToken, refreshToken },
+  });
+});
 
-    const organizations = await OrganizationAdmin.find({
-      zonalAdminId: roleData.zonalAdminId,
-      ...(adminIds.length
-        ? { adminId: { $in: adminIds } }
-        : {}),
-    }).lean();
+export const refreshToken = asyncHandler(async (req, res) => {
+  const { refreshToken: tokenFromBody } = req.body;
 
-    const organizationIds = uniqueNumbers(
-      organizations.map((org) => org.organizationId)
-    );
-
-    const organizationAdminIds = uniqueNumbers(
-      organizations.map((org) => org.organizationAdminId)
-    );
-
-    const teachers = organizationIds.length
-      ? await Teacher.find({
-          $or: [
-            {
-              zonalAdminId: roleData.zonalAdminId,
-              adminId: { $in: adminIds },
-              organizationId: { $in: organizationIds },
-            },
-            {
-              organizationId: { $in: organizationIds },
-              organizationAdminId: { $in: organizationAdminIds },
-            },
-          ],
-        }).lean()
-      : [];
-
-    const teacherIds = uniqueNumbers(
-      teachers.map((teacher) => teacher.teacherId)
-    );
-
-    const parents =
-      organizationIds.length && teacherIds.length
-        ? await Parent.find({
-            $or: [
-              {
-                zonalAdminId: roleData.zonalAdminId,
-                adminId: { $in: adminIds },
-                organizationId: { $in: organizationIds },
-                teacherId: { $in: teacherIds },
-              },
-              {
-                organizationId: { $in: organizationIds },
-                therapistId: { $in: teacherIds },
-              },
-            ],
-          }).lean()
-        : [];
-
-    // Get children against parents
-    const parentIds = uniqueNumbers(
-      parents.map((parent) => parent.parentId)
-    );
-
-    const children = parentIds.length
-      ? await Child.find({
-          parentId: { $in: parentIds },
-        }).lean()
-      : [];
-
-    // Get appointments against parentId + teacherId
-    const appointmentFilters = parents
-      .map((parent) => ({
-        parentId: parent.parentId,
-        teacherId: parent.teacherId,
-      }))
-      .filter(
-        (item) =>
-          item.parentId !== undefined &&
-          item.parentId !== null &&
-          item.teacherId !== undefined &&
-          item.teacherId !== null
-      );
-
-    const appointments = appointmentFilters.length
-      ? await Appointment.find({
-          $or: appointmentFilters,
-        }).lean()
-      : [];
-
-    return {
-      admins: withCount(admins),
-      organizations: withCount(organizations),
-      teachers: withCount(teachers),
-      parents: withCount(parents),
-      children: withCount(children),
-      appointments: withCount(appointments),
-    };
+  if (!tokenFromBody) {
+    return res.status(400).json({
+      success: false,
+      message: "Refresh token is required",
+    });
   }
 
-  if (user.flag === 7) {
-    const zonalAdminDoc = await ZonalAdmin.findOne({
-      $or: [
-        { zonalAdminId: roleData.zonalAdminId },
-        { userId: roleData.zonalAdminId },
-      ],
-    }).lean();
+  const { user, token, accessToken, refreshToken: newRefreshToken } =
+    await refreshAuthToken(tokenFromBody);
 
-    let zonalAdmin = null;
-    if (zonalAdminDoc) {
-      const userData = await User.findOne({
-        userId: zonalAdminDoc.userId,
-      })
-        .select("-password")
-        .lean();
+  res.status(200).json({
+    success: true,
+    message: "Token refreshed successfully",
+    data: {
+      user,
+      token,
+      accessToken,
+      refreshToken: newRefreshToken,
+    },
+  });
+});
 
-      zonalAdmin = {
-        ...zonalAdminDoc,
-        userData,
-      };
-    } else if (roleData.zonalAdminId) {
-      const userData = await User.findOne({
-        userId: roleData.zonalAdminId,
-      })
-        .select("-password")
-        .lean();
+export const getProfile = asyncHandler(async (req, res) => {
+  const user = await getUserById(req.user._id);
 
-      if (userData) {
-        zonalAdmin = {
-          userId: roleData.zonalAdminId,
-          userData,
-        };
-      }
-    }
+  res.status(200).json({
+    success: true,
+    data: user,
+  });
+});
 
-    if (!zonalAdmin) {
-      return {
-        zonalAdmin: null,
-        organizations: withCount([]),
-        teachers: withCount([]),
-        parents: withCount([]),
-        children: withCount([]),
-        appointments: withCount([]),
-      };
-    }
 
-    const organizations = await OrganizationAdmin.find({
-      zonalAdminId: roleData.zonalAdminId,
-      adminId: roleData.adminId,
-    }).lean();
+export const getAllUsers = asyncHandler(async (req, res) => {
+  const { flag, search, sort, sortBy, sortOrder } = req.body;
 
-    const organizationIds = uniqueNumbers(
-      organizations.map((org) => org.organizationId)
-    );
-
-    const organizationAdminIds = uniqueNumbers(
-      organizations.map((org) => org.organizationAdminId)
-    );
-
-    const teachers = organizationIds.length
-      ? await Teacher.find({
-          $or: [
-            {
-              zonalAdminId: roleData.zonalAdminId,
-              adminId: roleData.adminId,
-              organizationId: { $in: organizationIds },
-            },
-            {
-              organizationId: { $in: organizationIds },
-              organizationAdminId: { $in: organizationAdminIds },
-            },
-          ],
-        }).lean()
-      : [];
-
-    const teacherIds = uniqueNumbers(
-      teachers.map((teacher) => teacher.teacherId)
-    );
-
-    const parents =
-      organizationIds.length && teacherIds.length
-        ? await Parent.find({
-            $or: [
-              {
-                zonalAdminId: roleData.zonalAdminId,
-                adminId: roleData.adminId,
-                organizationId: { $in: organizationIds },
-                teacherId: { $in: teacherIds },
-              },
-              {
-                organizationId: { $in: organizationIds },
-                therapistId: { $in: teacherIds },
-              },
-            ],
-          }).lean()
-        : [];
-
-    // Get children against parents
-    const parentIds = uniqueNumbers(
-      parents.map((parent) => parent.parentId)
-    );
-
-    const children = parentIds.length
-      ? await Child.find({
-          parentId: { $in: parentIds },
-        }).lean()
-      : [];
-
-    // Get appointments against parentId + teacherId
-    const appointmentFilters = parents
-      .map((parent) => ({
-        parentId: parent.parentId,
-        teacherId: parent.teacherId,
-      }))
-      .filter(
-        (item) =>
-          item.parentId !== undefined &&
-          item.parentId !== null &&
-          item.teacherId !== undefined &&
-          item.teacherId !== null
-      );
-
-    const appointments = appointmentFilters.length
-      ? await Appointment.find({
-          $or: appointmentFilters,
-        }).lean()
-      : [];
-
-    return {
-      zonalAdmin,
-      organizations: withCount(organizations),
-      teachers: withCount(teachers),
-      parents: withCount(parents),
-      children: withCount(children),
-      appointments: withCount(appointments),
-    };
+  if (flag === undefined || flag === null) {
+    return res.status(400).json({
+      success: false,
+      message: "Flag is required",
+    });
   }
 
-  if (user.flag === 1) {
-    const adminDoc = await Admin.findOne({
-      $or: [
-        { adminId: roleData.adminId },
-        { userId: roleData.adminId },
-      ],
-    }).lean();
-
-    let admin = null;
-    if (adminDoc) {
-      const userData = await User.findOne({
-        userId: adminDoc.userId,
-      })
-        .select("-password")
-        .lean();
-
-      admin = {
-        ...adminDoc,
-        userData,
-      };
-    } else if (roleData.adminId) {
-      const userData = await User.findOne({
-        userId: roleData.adminId,
-      })
-        .select("-password")
-        .lean();
-
-      if (userData) {
-        admin = {
-          userId: roleData.adminId,
-          userData,
-        };
-      }
-    }
-
-    if (!admin) {
-      return {
-        Admin: null,
-        admin: null,
-        teachers: withCount([]),
-        parents: withCount([]),
-        children: withCount([]),
-        appointments: withCount([]),
-      };
-    }
-
-    const teachers = await Teacher.find({
-      $or: [
-        {
-          zonalAdminId: roleData.zonalAdminId,
-          adminId: roleData.adminId,
-          organizationId: roleData.organizationId,
-        },
-        {
-          organizationId: roleData.organizationId,
-          organizationAdminId: roleData.organizationAdminId,
-        },
-      ],
-    }).lean();
-
-    const teacherIds = uniqueNumbers(
-      teachers.map((teacher) => teacher.teacherId)
-    );
-
-    const parents = teacherIds.length
-      ? await Parent.find({
-          $or: [
-            {
-              zonalAdminId: roleData.zonalAdminId,
-              adminId: roleData.adminId,
-              organizationId: roleData.organizationId,
-              teacherId: { $in: teacherIds },
-            },
-            {
-              organizationId: roleData.organizationId,
-              therapistId: { $in: teacherIds },
-            },
-          ],
-        }).lean()
-      : [];
-
-    // Get children against parents
-    const parentIds = uniqueNumbers(
-      parents.map((parent) => parent.parentId)
-    );
-
-    const children = parentIds.length
-      ? await Child.find({
-          parentId: { $in: parentIds },
-        }).lean()
-      : [];
-
-    // Get appointments against parentId + teacherId
-    const appointmentFilters = parents
-      .map((parent) => ({
-        parentId: parent.parentId,
-        teacherId: parent.teacherId,
-      }))
-      .filter(
-        (item) =>
-          item.parentId !== undefined &&
-          item.parentId !== null &&
-          item.teacherId !== undefined &&
-          item.teacherId !== null
-      );
-
-    const appointments = appointmentFilters.length
-      ? await Appointment.find({
-          $or: appointmentFilters,
-        }).lean()
-      : [];
-
-    return {
-      Admin: admin,
-      admin,
-      teachers: withCount(teachers),
-      parents: withCount(parents),
-      children: withCount(children),
-      appointments: withCount(appointments),
-    };
-  }
-
-  if (user.flag === 3 || user.flag === 5) {
-    const adminDoc = await Admin.findOne({
-      $or: [
-        { adminId: roleData.adminId },
-        { userId: roleData.adminId },
-      ],
-    }).lean();
-
-    let admin = null;
-    if (adminDoc) {
-      const userData = await User.findOne({
-        userId: adminDoc.userId,
-      })
-        .select("-password")
-        .lean();
-
-      admin = {
-        ...adminDoc,
-        userData,
-      };
-    } else if (roleData.adminId) {
-      const userData = await User.findOne({
-        userId: roleData.adminId,
-      })
-        .select("-password")
-        .lean();
-
-      if (userData) {
-        admin = {
-          userId: roleData.adminId,
-          userData,
-        };
-      }
-    }
-
-    const orgDoc = await OrganizationAdmin.findOne({
-      $or: [
-        { organizationId: roleData.organizationId },
-        { organizationAdminId: roleData.organizationId },
-        { userId: roleData.organizationId },
-      ],
-    }).lean();
-
-    let organization = null;
-    if (orgDoc) {
-      const userData = await User.findOne({
-        userId: orgDoc.userId,
-      })
-        .select("-password")
-        .lean();
-
-      organization = {
-        ...orgDoc,
-        userData,
-      };
-    } else if (roleData.organizationId) {
-      const userData = await User.findOne({
-        userId: roleData.organizationId,
-      })
-        .select("-password")
-        .lean();
-
-      if (userData) {
-        organization = {
-          userId: roleData.organizationId,
-          userData,
-        };
-      }
-    }
-
-    const parentFilters = [
-      {
-        organizationId: roleData.organizationId,
-        therapistId: roleData.teacherId,
-      },
-    ];
-
-    if (
-      roleData.zonalAdminId !== undefined &&
-      roleData.zonalAdminId !== null
-    ) {
-      parentFilters.push({
-        zonalAdminId: roleData.zonalAdminId,
-        adminId: roleData.adminId,
-        organizationId: roleData.organizationId,
-        teacherId: roleData.teacherId,
-      });
-    }
-
-    const parents = await Parent.find({
-      $or: parentFilters,
-    }).lean();
-
-    // Get children against parents
-    const parentIds = uniqueNumbers(
-      parents.map((parent) => parent.parentId)
-    );
-
-    const children = parentIds.length
-      ? await Child.find({
-          parentId: { $in: parentIds },
-        }).lean()
-      : [];
-
-    // Get appointments against parentId + teacherId
-    const appointmentFilters = parents
-      .map((parent) => ({
-        parentId: parent.parentId,
-        teacherId: parent.teacherId,
-      }))
-      .filter(
-        (item) =>
-          item.parentId !== undefined &&
-          item.parentId !== null &&
-          item.teacherId !== undefined &&
-          item.teacherId !== null
-      );
-
-    const appointments = appointmentFilters.length
-      ? await Appointment.find({
-          $or: appointmentFilters,
-        }).lean()
-      : [];
-
-    return {
-      Admin: admin,
-      admin,
-      organizations: organization,
-      organization,
-      parents: withCount(parents),
-      children: withCount(children),
-      appointments: withCount(appointments),
-    };
-  }
-
-  if (user.flag === 2 || user.flag === 4) {
-    const adminDoc = await Admin.findOne({
-      $or: [
-        { adminId: roleData.adminId },
-        { userId: roleData.adminId },
-      ],
-    }).lean();
-
-    let admin = null;
-    if (adminDoc) {
-      const userData = await User.findOne({
-        userId: adminDoc.userId,
-      })
-        .select("-password")
-        .lean();
-
-      admin = {
-        ...adminDoc,
-        userData,
-      };
-    } else if (roleData.adminId) {
-      const userData = await User.findOne({
-        userId: roleData.adminId,
-      })
-        .select("-password")
-        .lean();
-
-      if (userData) {
-        admin = {
-          userId: roleData.adminId,
-          userData,
-        };
-      }
-    }
-
-    const orgDoc = await OrganizationAdmin.findOne({
-      $or: [
-        { organizationId: roleData.organizationId },
-        { organizationAdminId: roleData.organizationId },
-        { userId: roleData.organizationId },
-      ],
-    }).lean();
-
-    let organization = null;
-    if (orgDoc) {
-      const userData = await User.findOne({
-        userId: orgDoc.userId,
-      })
-        .select("-password")
-        .lean();
-
-      organization = {
-        ...orgDoc,
-        userData,
-      };
-    } else if (roleData.organizationId) {
-      const userData = await User.findOne({
-        userId: roleData.organizationId,
-      })
-        .select("-password")
-        .lean();
-
-      if (userData) {
-        organization = {
-          userId: roleData.organizationId,
-          userData,
-        };
-      }
-    }
-
-    // Get teacher
-    const teacherDoc = await Teacher.findOne({
-      $or: [
-        { teacherId: roleData.teacherId },
-        { userId: roleData.teacherId },
-      ],
-    }).lean();
-
-    let teacherWithUserData = null;
-    if (teacherDoc) {
-      const userData = await User.findOne({
-        userId: teacherDoc.userId,
-      })
-        .select("-password")
-        .lean();
-
-      teacherWithUserData = {
-        ...teacherDoc,
-        userData,
-      };
-    } else if (roleData.teacherId) {
-      const userData = await User.findOne({
-        userId: roleData.teacherId,
-      })
-        .select("-password")
-        .lean();
-
-      if (userData) {
-        teacherWithUserData = {
-          userId: roleData.teacherId,
-          userData,
-        };
-      }
-    }
-
-    // Get parents assigned to this teacher
-    const parentFilters = [
-      {
-        organizationId: roleData.organizationId,
-        therapistId: roleData.teacherId,
-      },
-    ];
-
-    if (
-      roleData.zonalAdminId !== undefined &&
-      roleData.zonalAdminId !== null
-    ) {
-      parentFilters.push({
-        zonalAdminId: roleData.zonalAdminId,
-        adminId: roleData.adminId,
-        organizationId: roleData.organizationId,
-        teacherId: roleData.teacherId,
-      });
-    }
-
-    const parents = await Parent.find({
-      $or: parentFilters,
-    }).lean();
-
-    // Get children against parents
-    const parentIds = uniqueNumbers(
-      parents.map((parent) => parent.parentId)
-    );
-
-    const children = parentIds.length
-      ? await Child.find({
-          parentId: { $in: parentIds },
-        }).lean()
-      : [];
-
-    // Get appointments against parentId + teacherId
-    const appointmentFilters = parents
-      .map((parent) => ({
-        parentId: parent.parentId,
-        teacherId: parent.teacherId,
-      }))
-      .filter(
-        (item) =>
-          item.parentId !== undefined &&
-          item.parentId !== null &&
-          item.teacherId !== undefined &&
-          item.teacherId !== null
-      );
-
-    const appointments = appointmentFilters.length
-      ? await Appointment.find({
-          $or: appointmentFilters,
-        }).lean()
-      : [];
-
-    return {
-      Admin: admin,
-      admin,
-      organizations: organization,
-      organization,
-      teacher: teacherWithUserData,
-      parents: withCount(parents),
-      children: withCount(children),
-      appointments: withCount(appointments),
-    };
-  }
-  return null;
-};
-export const getUserById = async (userId) => {
-  const user = await User.findById(userId).select("-password");
-
-  if (!user) {
-    const error = new Error("User not found");
-    error.statusCode = 404;
-    throw error;
-  }
-
-  let roleData = null;
-
-  if (user.flag === 0) {
-    roleData = await SuperAdmin.findOne({ userId: user.userId });
-  } 
-  else if (user.flag === 1) {
-    roleData = await OrganizationAdmin.findOne({ userId: user.userId });
-  } 
-  else if (user.flag === 2 || user.flag === 4) {
-    roleData = await Parent.findOne({ userId: user.userId });
-  } 
-  else if (user.flag === 3 || user.flag === 5) {
-    roleData = await Teacher.findOne({ userId: user.userId });
-  }
-  else if (user.flag === 6) {
-    roleData = await ZonalAdmin.findOne({ userId: user.userId });
-  }
-  else if (user.flag === 7) {
-    roleData = await Admin.findOne({ userId: user.userId });
-  } 
-
-  const relatedData = await getRelatedRoleData(user, roleData);
-
-  if (relatedData?.zonalAdmins?.data) {
-    relatedData.zonalAdmins.data = await enrichWithUserData(
-      relatedData.zonalAdmins.data
-    );
-  }
-
-  if (relatedData?.admins?.data) {
-    relatedData.admins.data = await enrichWithUserData(
-      relatedData.admins.data
-    );
-  }
-
-  if (relatedData?.organizations?.data) {
-    relatedData.organizations.data = await enrichWithUserData(
-      relatedData.organizations.data
-    );
-  }
-
-  if (relatedData?.teachers?.data) {
-    relatedData.teachers.data = await enrichWithUserData(
-      relatedData.teachers.data
-    );
-  }
-
-  if (relatedData?.parents?.data) {
-    relatedData.parents.data = await enrichWithUserData(
-      relatedData.parents.data
-    );
-  }
-
-  return {
-    user,
-    roleData,
-    relatedData,
-  };
-};
-
-export const updateProfileById = async (
-  userId,
-  profileData
-  ) => {
-
-  const allowedUpdates = {};
-
-  if (profileData.name !== undefined) {
-    allowedUpdates.name = profileData.name;
-  }
-
-  if (profileData.email !== undefined) {
-    allowedUpdates.email = profileData.email;
-  }
-
-  if (profileData.profileImg !== undefined) {
-    allowedUpdates.profileImg =
-      profileData.profileImg;
-  }
-  if (profileData.phone !== undefined) {
-    allowedUpdates.phone = profileData.phone;
-  }
-  if (profileData.city !== undefined) {
-    allowedUpdates.city = profileData.city;
-  }
-  if (profileData.state !== undefined) {
-    allowedUpdates.state = profileData.state;
-  }
-  if (profileData.pincode !== undefined) {
-    allowedUpdates.pincode = profileData.pincode;
-  }
-  if (profileData.address !== undefined) {
-    allowedUpdates.address = profileData.address;
-  }
-  if (profileData.country !== undefined) {
-    allowedUpdates.country = profileData.country;
-  }
-
-  const user = await User.findByIdAndUpdate(
+  const users = await getAllUsersService(Number(flag), {
+    search,
+    sort,
+    sortBy,
+    sortOrder,
+  });
+
+  res.status(200).json({
+    success: true,
+    count: users.length,
+    data: users,
+  });
+});
+
+export const getAllUsersByRelation = asyncHandler(async (req, res) => {
+  const {
+    flag,
     userId,
-    allowedUpdates,
-    {
-      returnDocument: "after",
-      runValidators: true,
-      context: "query",
-    }
-  ).select("-password");
+    search,
+    sort,
+    sortBy,
+    sortOrder,
+  } = req.body;
 
-  if (!user) {
-    const error = new Error("User not found");
-    error.statusCode = 404;
-    throw error;
+  if (flag === undefined || flag === null) {
+    return res.status(400).json({
+      success: false,
+      message: "Flag is required",
+    });
   }
 
-  return user;
-};
-
-// export const getAllUsersService = async (flag) => {
-//   const users = await User.find({ flag }).select("-password");
-
-//   if (!users || users.length === 0) {
-//     const error = new Error("No users found");
-//     error.statusCode = 404;
-//     throw error;
-//   }
-
-//   return users;
-// };
-
-
-export const getAllUsersService = async (flag, options = {}) => {
-  const users = await User.find({ flag }).select("-password").lean();
-
-  if (!users || users.length === 0) {
-    const error = new Error("No users found");
-    error.statusCode = 404;
-    throw error;
-  }
-
-  const enrichedUsers = await Promise.all(
-    users.map(async (user) => {
-      let roleData = null;
-
-      switch (user.flag) {
-        case 0:
-          roleData =
-            await SuperAdmin.findOne({
-              userId: user.userId,
-            }).lean();
-          break;
-
-        case 1:
-          roleData =
-            await OrganizationAdmin.findOne({
-              userId: user.userId,
-            }).lean();
-          break;
-
-        case 2:
-        case 4:
-          roleData =
-            await Parent.findOne({
-              userId: user.userId,
-            }).lean();
-          break;
-
-        case 3:
-        case 5:
-          roleData =
-            await Teacher.findOne({
-              userId: user.userId,
-            }).lean();
-          break;
-
-        case 6:
-          roleData =
-            await ZonalAdmin.findOne({
-              userId: user.userId,
-            }).lean();
-          break;
-
-        case 7:
-          roleData =
-            await Admin.findOne({
-              userId: user.userId,
-            }).lean();
-          break;
-
-        default:
-          roleData = null;
-      }
-
-      const relatedData = await getRelatedRoleData(user, roleData);
-
-      if (relatedData?.zonalAdmins?.data) {
-        relatedData.zonalAdmins.data = await enrichWithUserData(
-          relatedData.zonalAdmins.data
-        );
-      }
-
-      if (relatedData?.admins?.data) {
-        relatedData.admins.data = await enrichWithUserData(
-          relatedData.admins.data
-        );
-      }
-
-      if (relatedData?.organizations?.data) {
-        relatedData.organizations.data = await enrichWithUserData(
-          relatedData.organizations.data
-        );
-      }
-
-      if (relatedData?.teachers?.data) {
-        relatedData.teachers.data = await enrichWithUserData(
-          relatedData.teachers.data
-        );
-      }
-
-      if (relatedData?.parents?.data) {
-        relatedData.parents.data = await enrichWithUserData(
-          relatedData.parents.data
-        );
-      }
-
-      if (relatedData?.zonalAdmin && !relatedData.zonalAdmin.userData) {
-        relatedData.zonalAdmin = await enrichSingleWithUserData(
-          relatedData.zonalAdmin
-        );
-      }
-
-      if (relatedData?.Admin && !relatedData.Admin.userData) {
-        relatedData.Admin = await enrichSingleWithUserData(
-          relatedData.Admin
-        );
-      }
-
-      if (relatedData?.admin && !relatedData.admin.userData) {
-        relatedData.admin = await enrichSingleWithUserData(
-          relatedData.admin
-        );
-      }
-
-      if (
-        relatedData?.organizations &&
-        !relatedData.organizations.data &&
-        !relatedData.organizations.userData
-      ) {
-        relatedData.organizations = await enrichSingleWithUserData(
-          relatedData.organizations
-        );
-      }
-
-      if (relatedData?.organization && !relatedData.organization.userData) {
-        relatedData.organization = await enrichSingleWithUserData(
-          relatedData.organization
-        );
-      }
-
-      if (relatedData?.teacher && !relatedData.teacher.userData) {
-        relatedData.teacher = await enrichSingleWithUserData(
-          relatedData.teacher
-        );
-      }
-
-      return {
-        ...user,
-        roleData,
-        relatedData,
-      };
-    })
-  );
-
-  return applySearchAndSort(enrichedUsers, options);
-};
-
-export const getRelatedRoleDataRelation = async (
-  user,
-  roleData,
-  relationUserId
-) => {
-  switch (user.flag) {
-
-    // ==========================
-    // Zonal Admin
-    // ==========================
-    case 6:
-      return {
-        admins: {
-          count: await User.countDocuments({
-            flag: 7,
-            zonalAdminId: relationUserId,
-          }),
-          data: await User.find({
-            flag: 7,
-            zonalAdminId: relationUserId,
-          }).select("-password"),
-        },
-
-        organizations: {
-          count: await User.countDocuments({
-            flag: 1,
-            zonalAdminId: relationUserId,
-          }),
-          data: await User.find({
-            flag: 1,
-            zonalAdminId: relationUserId,
-          }).select("-password"),
-        },
-
-        teachers: {
-          count: await User.countDocuments({
-            flag: { $in: [3, 5] },
-            zonalAdminId: relationUserId,
-          }),
-          data: await User.find({
-            flag: { $in: [3, 5] },
-            zonalAdminId: relationUserId,
-          }).select("-password"),
-        },
-
-        parents: {
-          count: await User.countDocuments({
-            flag: { $in: [2, 4] },
-            zonalAdminId: relationUserId,
-          }),
-          data: await User.find({
-            flag: { $in: [2, 4] },
-            zonalAdminId: relationUserId,
-          }).select("-password"),
-        },
-      };
-
-    // ==========================
-    // Admin
-    // ==========================
-    case 7:
-      return {
-        organizations: {
-          count: await User.countDocuments({
-            flag: 1,
-            adminId: relationUserId,
-          }),
-          data: await User.find({
-            flag: 1,
-            adminId: relationUserId,
-          }).select("-password"),
-        },
-
-        teachers: {
-          count: await User.countDocuments({
-            flag: { $in: [3, 5] },
-            adminId: relationUserId,
-          }),
-          data: await User.find({
-            flag: { $in: [3, 5] },
-            adminId: relationUserId,
-          }).select("-password"),
-        },
-
-        parents: {
-          count: await User.countDocuments({
-            flag: { $in: [2, 4] },
-            adminId: relationUserId,
-          }),
-          data: await User.find({
-            flag: { $in: [2, 4] },
-            adminId: relationUserId,
-          }).select("-password"),
-        },
-      };
-
-    // ==========================
-    // Organization Admin
-    // ==========================
-    case 1:
-      return {
-        teachers: {
-          count: await User.countDocuments({
-            flag: { $in: [3, 5] },
-            organizationAdminId: relationUserId,
-          }),
-          data: await User.find({
-            flag: { $in: [3, 5] },
-            organizationAdminId: relationUserId,
-          }).select("-password"),
-        },
-
-        parents: {
-          count: await User.countDocuments({
-            flag: { $in: [2, 4] },
-            organizationAdminId: relationUserId,
-          }),
-          data: await User.find({
-            flag: { $in: [2, 4] },
-            organizationAdminId: relationUserId,
-          }).select("-password"),
-        },
-      };
-
-    // ==========================
-    // Teacher
-    // ==========================
-    case 3:
-    case 5:
-      return {
-        parents: {
-          count: await User.countDocuments({
-            flag: { $in: [2, 4] },
-            teacherId: relationUserId,
-          }),
-          data: await User.find({
-            flag: { $in: [2, 4] },
-            teacherId: relationUserId,
-          }).select("-password"),
-        },
-      };
-
-    // ==========================
-    // Parent
-    // ==========================
-    case 2:
-    case 4:
-      return {
-        parents: {
-          count: await User.countDocuments({
-            flag: { $in: [2, 4] },
-            parentId: relationUserId,
-          }),
-          data: await User.find({
-            flag: { $in: [2, 4] },
-            parentId: relationUserId,
-          }).select("-password"),
-        },
-      };
-
-    default:
-      return {};
-  }
-};
-
-export const getAllUsersByRelationService = async (flag,userId,options = {}) => {
-  let users = [];
-
-  if (flag === 0) {
-    users = await User.find({})
-      .select("-password")
-      .lean();
-  } else {
-    users = await User.find({
-      flag,
-      userId,
-    })
-      .select("-password")
-      .lean();
-  }
-
-  if (!users.length) {
-    throw new Error("No users found");
-  }
-
-  const enrichedUsers = await Promise.all(
-    users.map(async (user) => {
-      let roleData = null;
-
-      switch (user.flag) {
-        case 1:
-          roleData = await OrganizationAdmin.findOne({
-            userId: user.userId,
-          }).lean();
-          break;
-
-        case 2:
-        case 4:
-          roleData = await Parent.findOne({
-            userId: user.userId,
-          }).lean();
-          break;
-
-        case 3:
-        case 5:
-          roleData = await Teacher.findOne({
-            userId: user.userId,
-          }).lean();
-          break;
-
-        case 6:
-          roleData = await ZonalAdmin.findOne({
-            userId: user.userId,
-          }).lean();
-          break;
-
-        case 7:
-          roleData = await OrganizationAdmin.findOne({
-            userId: user.userId,
-          }).lean();
-          break;
-      }
-
-      const relatedData = await getRelatedRoleDataRelation(
-        user,
-        roleData,
-        user.userId // <-- pass current user's userId
-      );
-
-      return {
-        ...user,
-        roleData,
-        relatedData,
-      };
-    })
-  );
-
-  return applySearchAndSort(enrichedUsers, options);
-};
-
-// export const refreshAuthToken = async (refreshToken) => {
-//   if (!refreshToken) {
-//     const error = new Error("Refresh token not provided");
-//     error.statusCode = 400;
-//     throw error;
-//   }
-
-//   const decoded = verifyRefreshToken(refreshToken);
-
-//   const storedToken = await RefreshToken.findOne({
-//     token: refreshToken,
-//     revokedAt: null,
-//   });
-
-//   if (!storedToken || storedToken.expiresAt <= new Date()) {
-//     const error = new Error("Refresh token is invalid or expired");
-//     error.statusCode = 401;
-//     throw error;
-//   }
-
-//   const user = await User.findById(decoded.userId).select("-password");
-
-//   if (!user || user.status !== 1) {
-//     const error = new Error("User not found or inactive");
-//     error.statusCode = 401;
-//     throw error;
-//   }
-
-//   storedToken.revokedAt = new Date();
-//   await storedToken.save();
-
-//   const token = generateAccessToken(user._id.toString());
-//   const newRefreshToken = await createRefreshTokenRecord(user._id.toString(), user._id);
-
-//   return {
-//     user,
-//     token,
-//     accessToken: token,
-//     refreshToken: newRefreshToken,
-//   };
-// };
-
-export const refreshAuthToken = async (userId, sessionId) => {
-  const user = await User.findById(userId);
-
-  if (!user) {
-    throw new Error("User not found");
-  }
-
-  const session = user.sessions.find((s) => s.sessionId === sessionId);
-
-  if (!session) {
-    throw new Error("Invalid session");
-  }
-
-  // Check if refresh token is expired
-  if (new Date() > session.expiresAt) {
-    user.sessions = user.sessions.filter((s) => s.sessionId !== sessionId);
-    await user.save();
-    throw new Error("Refresh token expired. Please login again.");
-  }
-
-  // Update last activity
-  session.lastActivityAt = new Date();
-  await user.save();
-
-  return {
-    user,
-    sessionId,
-    accessTokenExpiry: 3600, // 1 hour
-  };
-};
-
-export const verifyRefreshTokenService = async (userId, sessionId, token) => {
-  const user = await User.findById(userId);
-
-  if (!user) {
-    throw new Error("User not found");
-  }
-
-  const session = user.sessions.find((s) => s.sessionId === sessionId);
-
-  if (!session) {
-    throw new Error("Invalid session");
-  }
-
-  if (!session.refreshToken || session.refreshToken !== token) {
-    throw new Error("Invalid refresh token");
-  }
-
-  return user;
-};
-
-// export const logoutUser = async (token, refreshToken) => {
-//   if (!token) {
-//     const error = new Error("Token not provided");
-//     error.statusCode = 400;
-//     throw error;
-//   }
-
-//   await BlacklistLog.create({
-//     token,
-//     expiresAt: getTokenExpiryDate(token),
-//   });
-
-//   if (refreshToken) {
-//     await RefreshToken.findOneAndUpdate(
-//       { token: refreshToken, revokedAt: null },
-//       { revokedAt: new Date() }
-//     );
-//   }
-
-//   return true;
-// };
-
-export const logoutUser = async (token, refreshToken = null) => {
-  if (!token) {
-    const error = new Error("Token not provided");
-    error.statusCode = 400;
-    throw error;
-  }
-
-  // Blacklist access token
-  await BlacklistLog.create({
-    token,
-    expiresAt: getTokenExpiryDate(token),
+  const users = await getAllUsersByRelationService(Number(flag), userId, {
+    search,
+    sort,
+    sortBy,
+    sortOrder,
   });
 
-  // Revoke refresh token if provided
-  if (refreshToken) {
-    await RefreshToken.findOneAndUpdate(
-      {
-        token: refreshToken,
-        revokedAt: null,
-      },
-      {
-        revokedAt: new Date(),
-      }
-    );
-  }
+  res.status(200).json({
+    success: true,
+    count: users.length,
+    data: users,
+  });
+});
 
-  return {
+
+export const logout = asyncHandler(async (req, res) => {
+  const token = req.token;
+
+  const refreshToken = req.body.refreshToken;
+
+  await logoutUser(token, refreshToken);
+
+  res.status(200).json({
     success: true,
     message: "Logged out successfully",
-  };
-};
+  });
+});
 
 
+// export const updateUser = asyncHandler(async (req, res) => {
+//   const userId = req.params.id;
+//   const { name, email, flag, organizationId, organization_type } = req.body;
 
-// export const updateUserService = async (userId, userData) => {
-//   const session = await mongoose.startSession();
+//   const result = await updateUserService(userId, {
+//     name,
+//     email,
+//     flag,
+//     organizationId,
+//     organization_type,
+//   });
 
-//   let user;
-//   let roleDoc;
+//   res.status(200).json({
+//     success: true,
+//     message: "User updated successfully",
+//     data: result,
+//   });
+// });
 
-//   try {
-//     await session.withTransaction(async () => {
+// export const updateUser = asyncHandler(async (req, res) => {
+//   const userId = req.params.id;
 
-//       // 1. Find existing user
-//       user = await User.findById(userId).session(session);
-//       if (!user) {
-//         const error = new Error("User not found");
-//         error.statusCode = 404;
-//         throw error;
-//       }
+//   const {
+//     name,
+//     email,
+//     flag,
+//     organizationId,
+//     organization_type,
+//     superAdminId,
+//     zonalAdminId,
+//     adminId,
+//     organizationAdminId,
+//     therapistId,
+//     teacherId,
+//     city,
+//     state,
+//     pincode,
+//     address,
+//     status,
+//     profileImg
+//   } = req.body;
 
-//       const flag = Number(userData.flag ?? user.flag);
+//   const result = await updateUserService(userId, {
+//     name,
+//     email,
+//     flag,
+//     organizationId,
+//     organization_type,
+//     superAdminId,
+//     zonalAdminId,
+//     adminId,
+//     organizationAdminId,
+//     therapistId,
+//     teacherId,
+//     city,
+//     state,
+//     pincode,
+//     address,
+//     status,
+//     profileImg
+//   });
 
-//       // 2. Validate conditions
-//       if (flag === 1 && userData.organization_type === undefined) {
-//         throw new Error("organization_type is required for Organization Admin");
-//       }
-
-//       if (flag === 1 && ![0, 1].includes(Number(userData.organization_type))) {
-//         throw new Error("organization_type must be 0 (Clinic) or 1 (School)");
-//       }
-
-//       if ((flag === 2 || flag === 3) && !userData.organizationId) {
-//         throw new Error("organizationId is required for flag 2 and 3");
-//       }
-
-//       // 3. Update USER
-//       user.name = userData.name ?? user.name;
-//       user.email = userData.email ?? user.email;
-//       user.flag = flag;
-
-//       await user.save({ session });
-
-//       // 4. Update ROLE COLLECTION
-//       if (flag === 0) {
-//         roleDoc = await SuperAdmin.findOneAndUpdate(
-//           { userId: user.userId },
-//           {},
-//           { new: true, session }
-//         );
-//       }
-
-//       else if (flag === 1) {
-//         roleDoc = await OrganizationAdmin.findOneAndUpdate(
-//           { userId: user.userId },
-//           {
-//             organization_type: Number(userData.organization_type),
-//           },
-//           { new: true, session }
-//         );
-//       }
-
-//       else if (flag === 2 || flag === 4) {
-//         roleDoc = await Parent.findOneAndUpdate(
-//           { userId: user.userId },
-//           {
-//             organizationId: flag === 2 ? Number(userData.organizationId) : null,
-//           },
-//           { new: true, session }
-//         );
-//       }
-
-//       else if (flag === 3 || flag === 5) {
-//         roleDoc = await Teacher.findOneAndUpdate(
-//           { userId: user.userId },
-//           {
-//             organizationId: flag === 3 ? Number(userData.organizationId) : null,
-//           },
-//           { new: true, session }
-//         );
-//       }
-
-//       else {
-//         throw new Error("Invalid flag");
-//       }
-//     });
-
-//     session.endSession();
-
-//     const userObj = user.toObject();
-//     delete userObj.password;
-
-//     return {
-//       user: userObj,
-//       role: roleDoc
-//         ? { collection: roleDoc.constructor.modelName, _id: roleDoc._id }
-//         : null,
-//     };
-
-//   } catch (error) {
-//     session.endSession();
-//     throw error;
-//   }
-// };
+//   res.status(200).json({
+//     success: true,
+//     message: "User updated successfully",
+//     data: result,
+//   });
+// });
 
 
-export const updateUserService = async (userId, userData) => {
-  const session = await mongoose.startSession();
+export const updateUser = asyncHandler(async (req, res) => {
+  const userId = req.params.id;
 
-  let user;
-  let roleDoc;
-
-  try {
-    await session.withTransaction(async () => {
-
-      // 1. Find user
-      user = await User.findById(userId).session(session);
-      if (!user) {
-        throw new Error("User not found");
-      }
-
-      const flag = Number(userData.flag ?? user.flag);
-
-      if (flag === user.flag) {
-        if (flag === 1) {
-          const existingRole = await OrganizationAdmin.findOne({ userId: user.userId }).session(session);
-          userData.adminId ??= existingRole?.adminId;
-          userData.organization_type ??= existingRole?.organization_type;
-        } else if (flag === 2) {
-          const existingRole = await Parent.findOne({ userId: user.userId }).session(session);
-          userData.therapistId ??= existingRole?.therapistId;
-        } else if (flag === 3) {
-          const existingRole = await Teacher.findOne({ userId: user.userId }).session(session);
-          userData.organizationAdminId ??= existingRole?.organizationAdminId;
-        } else if (flag === 6) {
-          const existingRole = await ZonalAdmin.findOne({ userId: user.userId }).session(session);
-          userData.superAdminId ??= existingRole?.superAdminId;
-        } else if (flag === 7) {
-          const existingRole = await Admin.findOne({ userId: user.userId }).session(session);
-          userData.zonalAdminId ??= existingRole?.zonalAdminId;
-        }
-      }
-
-      if (flag === 1) {
-        if (userData.organization_type === undefined) {
-          throw new Error("organization_type required");
-        }
-
-        if (![0, 1].includes(Number(userData.organization_type))) {
-          throw new Error("organization_type must be 0 or 1");
-        }
-      }
-
-      const parents = await getRoleParents(flag, userData);
-
-      user.name = userData.name ?? user.name;
-      user.email = userData.email ?? user.email;
-      user.status = userData.status ?? user.status;
-      user.profileImg = userData.profileImg ?? user.profileImg;
-      user.flag = flag;
-
-      await user.save({ session });
-
-
-      if (flag === 0) {
-        roleDoc = await SuperAdmin.findOneAndUpdate(
-          { userId: user.userId },
-          {},
-          {
-            returnDocument: "after",
-            session
-          }
-        );
-      }
-
-      else if (flag === 1) {
-        roleDoc = await OrganizationAdmin.findOneAndUpdate(
-          { userId: user.userId },
-          {
-            organization_type: Number(userData.organization_type),
-            adminId: parents.admin.adminId,
-            zonalAdminId: parents.admin.zonalAdminId,
-            city: userData.city,
-            state: userData.state,
-            pincode: userData.pincode,
-            address: userData.address
-          },
-          {
-            returnDocument: "after",
-            session
-          }
-        );
-      }
-
-      else if (flag === 2 || flag === 4) {
-        roleDoc = await Parent.findOneAndUpdate(
-          { userId: user.userId },
-          {
-            organizationId: flag === 2 ? parents.therapist.organizationId : null,
-            organizationAdminId:
-              flag === 2 ? parents.therapist.organizationAdminId : null,
-            zonalAdminId:
-              flag === 2
-                ? parents.therapist.zonalAdminId ??
-                  parents.organizationAdmin?.zonalAdminId
-                : null,
-            adminId:
-              flag === 2
-                ? parents.therapist.adminId ?? parents.organizationAdmin?.adminId
-                : null,
-            therapistId: flag === 2 ? parents.therapist.teacherId : null,
-            teacherId: flag === 2 ? parents.therapist.teacherId : null,
-          },
-          {
-            returnDocument: "after",
-            session
-          }
-        );
-      }
-
-      else if (flag === 3 || flag === 5) {
-        roleDoc = await Teacher.findOneAndUpdate(
-          { userId: user.userId },
-          {
-            organizationId: flag === 3 ? parents.organizationAdmin.organizationId : null,
-            organizationAdminId: flag === 3 ? parents.organizationAdmin.organizationAdminId : null,
-            zonalAdminId: flag === 3 ? parents.organizationAdmin.zonalAdminId : null,
-            adminId: flag === 3 ? parents.organizationAdmin.adminId : null,
-          },
-          {
-            returnDocument: "after",
-            session
-          }
-        );
-      }
-
-      else if (flag === 6) {
-        roleDoc = await ZonalAdmin.findOneAndUpdate(
-          { userId: user.userId },
-          {
-            superAdminId: parents.superAdmin.adminId,
-            city: userData.city,
-            state: userData.state,
-            pincode: userData.pincode,
-            address: userData.address
-          },
-          {
-            returnDocument: "after",
-            session
-          }
-        );
-      }
-
-      else if (flag === 7) {
-        roleDoc = await Admin.findOneAndUpdate(
-          { userId: user.userId },
-          {
-            zonalAdminId: parents.zonalAdmin.zonalAdminId,
-            city: userData.city,
-            state: userData.state,
-            pincode: userData.pincode,
-            address: userData.address,
-            status: userData.status ?? user.status,
-          },
-          {
-            returnDocument: "after",
-            session
-          }
-        );
-      }
-
-      else {
-        throw new Error("Invalid flag");
-      }
-
-    });
-
-    session.endSession();
-
-    const userObj = user.toObject();
-    delete userObj.password;
-
-    return {
-      user: userObj,
-      role: roleDoc
-        ? { collection: roleDoc.constructor.modelName, _id: roleDoc._id }
-        : null,
-    };
-
-  } catch (error) {
-    session.endSession();
-    throw error;
-  }
-};
-
-export const deleteUsersService = async (userIds) => {
-  const session = await mongoose.startSession();
-
-  try {
-    await session.withTransaction(async () => {
-      for (const userId of userIds) {
-        await deleteUserById(userId, session);
-      }
-    });
-
-    return {
-      success: true,
-      message:
-        userIds.length === 1
-          ? "User deleted successfully"
-          : `${userIds.length} users deleted successfully`,
-    };
-  } finally {
-    session.endSession();
-  }
-};
-
-const deleteUserById = async (userId, session) => {
-  const user = await User.findById(userId).session(session);
-
-  if (!user) {
-    throw new Error(`User not found: ${userId}`);
-  }
-
-  const flag = user.flag;
-
-  if (flag === 0) {
-    await SuperAdmin.deleteOne({ userId: user.userId }).session(session);
-  } else if (flag === 1) {
-    await OrganizationAdmin.deleteOne({ userId: user.userId }).session(session);
-  } else if (flag === 2 || flag === 4) {
-    await Parent.deleteOne({ userId: user.userId }).session(session);
-  } else if (flag === 3 || flag === 5) {
-    await Teacher.deleteOne({ userId: user.userId }).session(session);
-  } else if (flag === 6) {
-    await ZonalAdmin.deleteOne({ userId: user.userId }).session(session);
-  } else if (flag === 7) {
-    await Admin.deleteOne({ userId: user.userId }).session(session);
-  } else {
-    throw new Error("Invalid flag");
-  }
-
-  await User.deleteOne({ _id: userId }).session(session);
-};
-
-// Generate 5-digit OTP
-const generateOTP = () => {
-  return Math.floor(10000 + Math.random() * 90000).toString();
-};
-
-// Verify email and send OTP
-export const verifyEmailAndSendOTP = async (email) => {
-  const user = await User.findOne({ email });
-
-  if (!user) {
-    const error = new Error("Email not registered in the system");
-    error.statusCode = 404;
-    throw error;
-  }
-
-  // Generate 5-digit OTP
-  const otp = generateOTP();
-
-  // Set OTP expiry to 10 minutes
-  const otpExpiry = new Date(Date.now() + 10 * 60 * 1000);
-
-  // Update user with OTP and expiry
-  user.resetPasswordOTP = otp;
-  user.resetPasswordOTPExpiry = otpExpiry;
-  await user.save();
-
-  // Send OTP to email
-  await sendEmail(
+  const {
+    name,
     email,
-    "Password Reset OTP",
-    `
-      <h2>Password Reset Request</h2>
-      <p>Hello ${user.name},</p>
-      <p>Your OTP for password reset is:</p>
-      <h1 style="color: #007bff; font-size: 32px; letter-spacing: 2px;">${otp}</h1>
-      <p>This OTP is valid for 10 minutes.</p>
-      <p>If you didn't request this, please ignore this email.</p>
-    `
+    flag,
+    organizationId,
+    organization_type,
+    superAdminId,
+    zonalAdminId,
+    adminId,
+    organizationAdminId,
+    therapistId,
+    teacherId,
+    city,
+    state,
+    pincode,
+    address,
+    status,
+  } = req.body;
+
+  const profileImg = req.file
+    ? `/uploads/profile/${req.file.filename}`
+    : req.body.profileImg;
+
+  const result = await updateUserService(userId, {
+    name,
+    email,
+    flag,
+    organizationId,
+    organization_type,
+    superAdminId,
+    zonalAdminId,
+    adminId,
+    organizationAdminId,
+    therapistId,
+    teacherId,
+    city,
+    state,
+    pincode,
+    address,
+    status,
+    profileImg,
+  });
+
+  res.status(200).json({
+    success: true,
+    message: "User updated successfully",
+    data: result,
+  });
+});
+
+export const deleteUsersCon = asyncHandler(async (req, res) => {
+  const { userIds } = req.body;
+
+  if (!Array.isArray(userIds) || userIds.length === 0) {
+    return res.status(400).json({
+      success: false,
+      message: "Please provide userIds array",
+    });
+  }
+
+  const result = await deleteUsersService(userIds);
+
+  res.status(200).json({
+    success: true,
+    message: result.message,
+  });
+});
+
+export const forgotPassword = asyncHandler(async (req, res) => {
+  const { email } = req.body;
+  if (!email) {
+    return res.status(400).json({ success: false, message: "Email is required" });
+  }
+
+  res.status(200).json({
+    success: true,
+    message: "Password reset email sent successfully",
+    data: { email },
+  });
+});
+
+export const resetPassword = asyncHandler(async (req, res) => {
+  const { email, otp, password } = req.body;
+  if (!email || !otp || !password) {
+    return res.status(400).json({ success: false, message: "Email, OTP, and new password are required" });
+  }
+
+  const result = await resetPasswordWithOTP(email, otp, password);
+
+  res.status(200).json({
+    success: true,
+    message: result.message,  
+  });
+});
+
+export const verifyEmail = asyncHandler(async (req, res) => {
+  const { email } = req.body;
+  if (!email) {
+    return res.status(400).json({ success: false, message: "Email is required" });
+  }
+
+  const result = await verifyEmailAndSendOTP(email);
+
+  res.status(200).json({
+    success: true,
+    message: result.message,
+    data: { email: result.email },
+  });
+});
+
+export const validateEmailOTP = asyncHandler(async (req, res) => {
+  const { email, otp } = req.body;
+  if (!email || !otp) {
+    return res.status(400).json({ success: false, message: "Email and OTP are required" });
+  }
+
+  const result = await validateOTP(email, otp);
+
+  res.status(200).json({
+    success: true,
+    message: result.message,
+    data: { userId: result.userId },
+  });
+});
+
+// export const updateProfile = asyncHandler(async (req, res) => {
+
+//   const profileData = {
+//     ...req.body,
+//     profileImg: req.file
+//       ? `/uploads/profile/${req.file.filename}`
+//       : req.body.profileImg,
+//   };
+
+//   const updatedProfile = await updateProfileById(
+//     req.user._id,
+//     profileData
+//   );
+
+//   res.status(200).json({
+//     success: true,
+//     message: "Profile updated successfully",
+//     data: updatedProfile,
+//   });
+// });
+
+
+export const updateProfile = asyncHandler(async (req, res) => {
+  // console.log("PARAM ID:", req.params.id);
+  // console.log("BODY:", req.body);
+
+  const profileData = {
+    ...req.body,
+    profileImg: req.file
+      ? `/uploads/profile/${req.file.filename}`
+      : req.body.profileImg,
+  };
+
+  const updatedProfile = await updateProfileById(
+    req.params.id,
+    profileData
   );
 
-  return { success: true, message: "OTP sent to your registered email", email };
-};
+  console.log("UPDATED:", updatedProfile);
 
-// Validate OTP
-export const validateOTP = async (email, otp) => {
-  const user = await User.findOne({ email });
+  res.status(200).json({
+    success: true,
+    message: "Profile updated successfully",
+    data: updatedProfile,
+  });
+});
 
-  if (!user) {
-    const error = new Error("User not found");
-    error.statusCode = 404;
-    throw error;
+export const changePassword = asyncHandler(async (req, res) => {
+  const { currentPassword, newPassword } = req.body;
+  if (!currentPassword || !newPassword) {
+    return res.status(400).json({ success: false, message: "Current and new password are required" });
   }
 
-  if (!user.resetPasswordOTP) {
-    const error = new Error("No OTP request found. Please request a password reset first.");
-    error.statusCode = 400;
-    throw error;
+  res.status(200).json({
+    success: true,
+    message: "Password changed successfully",
+  });
+});
+
+
+export const getAllUsersById = asyncHandler(async (req, res) => {
+  const { userId } = req.body;
+
+  if (!userId) {
+    return res.status(400).json({
+      success: false,
+      message: "userId is required",
+    });
   }
 
-  // Check if OTP matches
-  if (user.resetPasswordOTP !== otp) {
-    const error = new Error("Invalid OTP");
-    error.statusCode = 400;
-    throw error;
-  }
+  const users = await getAllUsersServiceById(userId);
 
-  // Check if OTP has expired
-  if (new Date() > user.resetPasswordOTPExpiry) {
-    const error = new Error("OTP has expired. Please request a new one.");
-    error.statusCode = 400;
-    throw error;
-  }
+  res.status(200).json({
+    success: true,
+    count: users.length,
+    data: users,
+  });
+});
 
-  return { success: true, message: "OTP validated successfully", userId: user._id };
-};
+// OTP flow for any valid email address. It uses in-memory storage only.
+export const sendOtpToEmail = asyncHandler(async (req, res) => {
+  const { email } = req.body;
+  const result = await sendEmailOtp(email);
 
-// Reset password with OTP
-export const resetPasswordWithOTP = async (email, otp, newPassword) => {
-  const user = await User.findOne({ email });
+  res.status(200).json({
+    success: true,
+    message: "OTP sent successfully",
+    data: result,
+  });
+});
 
-  if (!user) {
-    const error = new Error("User not found");
-    error.statusCode = 404;
-    throw error;
-  }
+export const validateUnregisteredEmailOtp = asyncHandler(async (req, res) => {
+  const { email, otp } = req.body;
+  const result = validateEmailOtp(email, otp);
 
-  if (!user.resetPasswordOTP) {
-    const error = new Error("No OTP request found");
-    error.statusCode = 400;
-    throw error;
-  }
+  res.status(200).json({
+    success: true,
+    message: "OTP validated successfully",
+    data: { email: result.email, verified: true },
+  });
+});
 
-  // Validate OTP
-  if (user.resetPasswordOTP !== otp) {
-    const error = new Error("Invalid OTP");
-    error.statusCode = 400;
-    throw error;
-  }
-
-  // Check if OTP has expired
-  if (new Date() > user.resetPasswordOTPExpiry) {
-    const error = new Error("OTP has expired");
-    error.statusCode = 400;
-    throw error;
-  }
-
-  // Update password
-  user.password = newPassword;
-  user.resetPasswordOTP = null;
-  user.resetPasswordOTPExpiry = null;
-  await user.save();
-
-  return { success: true, message: "Password updated successfully" };
-};
-
-export const getAllUsersServiceById = async (userId) => {
-  const user = await User.findOne({ userId })
-    .select("-password")
-    .lean();
-
-  if (!user) {
-    const error = new Error("User not found");
-    error.statusCode = 404;
-    throw error;
-  }
-
-  let roleData = null;
-
-  switch (user.flag) {
-    case 0:
-      roleData = await SuperAdmin.findOne({
-        userId: user.userId,
-      }).lean();
-      break;
-
-    case 1:
-      roleData = await OrganizationAdmin.findOne({
-        userId: user.userId,
-      }).lean();
-      break;
-
-    case 2:
-    case 4:
-      roleData = await Parent.findOne({
-        userId: user.userId,
-      }).lean();
-      break;
-
-    case 3:
-    case 5:
-      roleData = await Teacher.findOne({
-        userId: user.userId,
-      }).lean();
-      break;
-
-    case 6:
-      roleData = await ZonalAdmin.findOne({
-        userId: user.userId,
-      }).lean();
-      break;
-
-    case 7:
-      roleData = await Admin.findOne({
-        userId: user.userId,
-      }).lean();
-      break;
-
-    default:
-      roleData = null;
-  }
-
-  const relatedData = await getRelatedRoleData(user, roleData);
-
-  if (relatedData?.zonalAdmins?.data) {
-    relatedData.zonalAdmins.data = await enrichWithUserData(
-      relatedData.zonalAdmins.data
-    );
-  }
-
-  if (relatedData?.admins?.data) {
-    relatedData.admins.data = await enrichWithUserData(
-      relatedData.admins.data
-    );
-  }
-
-  if (relatedData?.organizations?.data) {
-    relatedData.organizations.data = await enrichWithUserData(
-      relatedData.organizations.data
-    );
-  }
-
-  if (relatedData?.teachers?.data) {
-    relatedData.teachers.data = await enrichWithUserData(
-      relatedData.teachers.data
-    );
-  }
-
-  if (relatedData?.parents?.data) {
-    relatedData.parents.data = await enrichWithUserData(
-      relatedData.parents.data
-    );
-  }
-
-  if (relatedData?.zonalAdmin && !relatedData.zonalAdmin.userData) {
-    relatedData.zonalAdmin = await enrichSingleWithUserData(
-      relatedData.zonalAdmin
-    );
-  }
-
-  if (relatedData?.Admin && !relatedData.Admin.userData) {
-    relatedData.Admin = await enrichSingleWithUserData(
-      relatedData.Admin
-    );
-  }
-
-  if (relatedData?.admin && !relatedData.admin.userData) {
-    relatedData.admin = await enrichSingleWithUserData(
-      relatedData.admin
-    );
-  }
+export const addChildInformation = asyncHandler(async (req, res) => {
+  const {
+    parentId,
+    childName,
+    childAge,
+    childGender,
+    grade,
+    familyType,
+    language,
+    dob,
+  } = req.body;
 
   if (
-    relatedData?.organizations &&
-    !relatedData.organizations.data &&
-    !relatedData.organizations.userData
+    parentId === undefined ||
+    !childName ||
+    childAge === undefined ||
+    !childGender ||
+    !grade ||
+    !familyType ||
+    !language
   ) {
-    relatedData.organizations = await enrichSingleWithUserData(
-      relatedData.organizations
-    );
-  }
-
-  if (relatedData?.organization && !relatedData.organization.userData) {
-    relatedData.organization = await enrichSingleWithUserData(
-      relatedData.organization
-    );
-  }
-
-  if (relatedData?.teacher && !relatedData.teacher.userData) {
-    relatedData.teacher = await enrichSingleWithUserData(
-      relatedData.teacher
-    );
-  }
-
-  return {
-    ...user,
-    roleData,
-    relatedData,
-  };
-};
-
-export const addChildInformationService = async (parentId, childData) => {
-  const numericParentId = toPositiveNumber(parentId, "parentId");
-  const parent = await Parent.findOne({ parentId: numericParentId });
-
-  if (!parent) {
-    const error = new Error("Parent not found");
-    error.statusCode = 404;
-    throw error;
-  }
-
-  const existingChild = await Child.exists({ parentId: parent.parentId });
-  if (existingChild) {
-    const error = new Error("Child information already exists for this parentId");
-    error.statusCode = 409;
-    throw error;
-  }
-
-  try {
-    return await Child.create({
-      parentId: parent.parentId,
-      childName: childData.childName,
-      childGender: childData.childGender,
-      childAge: Number(childData.childAge),
-      grade: childData.grade,
-      familyType: childData.familyType,
-      language: childData.language,
-      dob: childData.dob,
+    return res.status(400).json({
+      success: false,
+      message:
+        "parentId, childName, childAge, childGender, grade, familyType, and language are required",
     });
-  } catch (error) {
-    // The unique index covers concurrent requests that pass the check above.
-    if (error?.code === 11000 && error?.keyPattern?.parentId) {
-      const conflictError = new Error(
-        "Child information already exists for this parentId"
-      );
-      conflictError.statusCode = 409;
-      throw conflictError;
-    }
-    throw error;
-  }
-};
-
-export const saveQuestionAnswerService = async ({ parentId, questionAnswers }) => {
-  if (!Number.isFinite(Number(parentId)) || Number(parentId) <= 0) {
-    const error = new Error("A valid parentId is required");
-    error.statusCode = 400;
-    throw error;
   }
 
-  const numericParentId = toPositiveNumber(parentId, "parentId");
-  const parent = await Parent.findOne({ parentId: numericParentId });
-
-  if (!parent) {
-    const error = new Error("Parent not found");
-    error.statusCode = 404;
-    throw error;
-  }
-
-  const existingChild = await Personalize.exists({ parentId: parent.parentId });
-  if (existingChild) {
-    const error = new Error("Child information already exists for this parentId");
-    error.statusCode = 409;
-    throw error;
-  }
-
-  if (!Array.isArray(questionAnswers) || questionAnswers.length === 0) {
-    const error = new Error("questionAnswers must contain at least one question and answer");
-    error.statusCode = 400;
-    throw error;
-  }
-
-  const answers = questionAnswers.map(({ question, answer }) => {
-    if (typeof question !== "string" || !question.trim()) {
-      const error = new Error("Each questionAnswers item requires a question");
-      error.statusCode = 400;
-      throw error;
-    }
-
-    if (answer === undefined || answer === null) {
-      const error = new Error("Each questionAnswers item requires an answer");
-      error.statusCode = 400;
-      throw error;
-    }
-
-    return { question: question.trim(), answer };
+  const child = await addChildInformationService(parentId, {
+    childName,
+    childAge,
+    childGender,
+    grade,
+    familyType,
+    language,
+    dob,
   });
 
-  return Personalize.findOneAndUpdate(
-    { parentId: Number(parentId) },
-    {
-      $setOnInsert: { parentId: Number(parentId) },
-      $push: { questionAnswers: { $each: answers } },
-    },
-    { new: true, upsert: true, runValidators: true }
-  );
-};
+  res.status(201).json({
+    success: true,
+    message: "Child information added successfully",
+    data: child,
+  });
+});
 
-export const getQuestionAnswerService = async (parentId) => {
-  const users = await Personalize.find({ parentId }).select();
+export const saveQuestionAnswer = asyncHandler(async (req, res) => {
+  const personalize = await saveQuestionAnswerService(req.body);
 
-  if (!users || users.length === 0) {
-    const error = new Error("No data found");
-    error.statusCode = 404;
-    throw error;
+  res.status(200).json({
+    success: true,
+    message: "Question and answer saved successfully",
+    data: personalize,
+  });
+});
+
+export const getQuestionAnswer = asyncHandler(async (req, res) => {
+
+  const { parentId } = req.body;
+  const personalize = await getQuestionAnswerService(parentId);
+
+  res.status(200).json({
+    success: true,
+    message: "get data successfully",
+    data: personalize,
+  });
+});
+
+export const updateQuestionAnswer = asyncHandler(async (req, res) => {
+  const personalize = await updateQuestionAnswerService(req.body);
+
+  res.status(200).json({
+    success: true,
+    message: "Question and answer updated successfully",
+    data: personalize,
+  });
+});
+
+export const updateUserRelation = asyncHandler(async (req, res) => {
+  const {
+    flag,
+    userId,
+    updatedUserId,
+  } = req.body;
+
+  if (flag === undefined || flag === null) {
+    return res.status(400).json({
+      success: false,
+      message: "flag is required",
+    });
   }
 
-  return users;
-};
-
-export const updateQuestionAnswerService = async ({ parentId, questionAnswers }) => {
-  if (!Number.isFinite(Number(parentId)) || Number(parentId) <= 0) {
-    const error = new Error("A valid parentId is required");
-    error.statusCode = 400;
-    throw error;
+  if (userId === undefined || userId === null) {
+    return res.status(400).json({
+      success: false,
+      message: "userId is required",
+    });
   }
 
-  const numericParentId = toPositiveNumber(parentId, "parentId");
-  const parent = await Parent.findOne({ parentId: numericParentId });
-
-  if (!parent) {
-    const error = new Error("Parent not found");
-    error.statusCode = 404;
-    throw error;
+  if (updatedUserId === undefined || updatedUserId === null) {
+    return res.status(400).json({
+      success: false,
+      message: "updatedUserId is required",
+    });
   }
 
-  const existingChild = await Personalize.exists({ parentId: parent.parentId });
-  if (existingChild) {
-    const error = new Error("Child information already exists for this parentId");
-    error.statusCode = 409;
-    throw error;
-  }
-
-  if (!Array.isArray(questionAnswers) || questionAnswers.length === 0) {
-    const error = new Error("questionAnswers must contain at least one question and answer");
-    error.statusCode = 400;
-    throw error;
-  }
-
-  const answers = questionAnswers.map(({ question, answer }) => {
-    if (typeof question !== "string" || !question.trim()) {
-      const error = new Error("Each questionAnswers item requires a question");
-      error.statusCode = 400;
-      throw error;
-    }
-
-    if (answer === undefined || answer === null) {
-      const error = new Error("Each questionAnswers item requires an answer");
-      error.statusCode = 400;
-      throw error;
-    }
-
-    return { question: question.trim(), answer };
+  const result = await updateUserRelationService({
+    flag,
+    userId,
+    updatedUserId,
   });
 
-  return Personalize.findOneAndUpdate(
-    { parentId: Number(parentId) },
-    {
-      $setOnInsert: { parentId: Number(parentId) },
-      $push: { questionAnswers: { $each: answers } },
-    },
-    { new: true, upsert: true, runValidators: true }
-  );
-};
-
-
-export const updateUserRelationService = async ({
-  flag,
-  userId,
-  updatedUserId,
-}) => {
-  const numericFlag = Number(flag);
-  const currentUserId = Number(userId);
-  const newUserId = Number(updatedUserId);
-
-  if (!Number.isInteger(numericFlag)) {
-    const error = new Error("Invalid flag");
-    error.statusCode = 400;
-    throw error;
-  }
-
-  if (!Number.isInteger(currentUserId) || currentUserId <= 0) {
-    const error = new Error("Invalid userId");
-    error.statusCode = 400;
-    throw error;
-  }
-
-  if (!Number.isInteger(newUserId) || newUserId <= 0) {
-    const error = new Error("Invalid updatedUserId");
-    error.statusCode = 400;
-    throw error;
-  }
-
-  /*
-   * FLAG 7
-   *
-   * Existing Admin:
-   *   userId = current admin
-   *
-   * Update:
-   *   Admin.zonalAdminId = updatedUserId
-   */
-  if (numericFlag === 7) {
-    const admin = await Admin.findOne({
-      userId: currentUserId,
-    });
-
-    if (!admin) {
-      const error = new Error(
-        `Admin not found with userId ${currentUserId}`
-      );
-      error.statusCode = 404;
-      throw error;
-    }
-
-    const zonalAdmin = await ZonalAdmin.findOne({
-      zonalAdminId: newUserId,
-    });
-
-    if (!zonalAdmin) {
-      const error = new Error(
-        `Zonal Admin not found with userId ${newUserId}`
-      );
-      error.statusCode = 404;
-      throw error;
-    }
-
-    admin.zonalAdminId = newUserId;
-
-    await admin.save();
-
-    return {
-      flag: numericFlag,
-      userId: currentUserId,
-      updatedUserId: newUserId,
-      type: "Admin",
-      data: admin,
-    };
-  }
-
-  /*
-   * FLAG 1
-   *
-   * Existing Organization Admin:
-   *   userId = organization admin
-   *
-   * 1. organizationadmins.adminId = updatedUserId
-   *
-   * 2. Find Admin where:
-   *      Admin.userId === updatedUserId
-   *
-   * 3. Get Admin.zonalAdminId
-   *
-   * 4. organizationadmins.zonalAdminId =
-   *      Admin.zonalAdminId
-   */
-  if (numericFlag === 1) {
-    const organizationAdmin = await OrganizationAdmin.findOne({
-      userId: currentUserId,
-    });
-
-    if (!organizationAdmin) {
-      const error = new Error(
-        `Organization Admin not found with userId ${currentUserId}`
-      );
-      error.statusCode = 404;
-      throw error;
-    }
-
-    const admin = await Admin.findOne({
-      userId: newUserId,
-    });
-
-    if (!admin) {
-      const error = new Error(
-        `Admin not found with userId ${newUserId}`
-      );
-      error.statusCode = 404;
-      throw error;
-    }
-
-    organizationAdmin.adminId = newUserId;
-    organizationAdmin.zonalAdminId = admin.zonalAdminId;
-
-    await organizationAdmin.save();
-
-    return {
-      flag: numericFlag,
-      userId: currentUserId,
-      updatedUserId: newUserId,
-      type: "OrganizationAdmin",
-      data: organizationAdmin,
-    };
-  }
-
-  /*
-   * FLAG 3
-   *
-   * Existing Teacher/Therapist:
-   *   userId = teacher
-   *
-   * updatedUserId = new Organization Admin
-   *
-   * Find OrganizationAdmin:
-   *   organizationAdminId === updatedUserId
-   *
-   * Then update Teacher:
-   *
-   *   organizationAdminId = OrganizationAdmin.organizationAdminId
-   *   organizationId      = OrganizationAdmin.organizationId
-   *   adminId             = OrganizationAdmin.adminId
-   *   zonalAdminId        = OrganizationAdmin.zonalAdminId
-   */
-  if (numericFlag === 3) {
-    const teacher = await Teacher.findOne({
-      userId: currentUserId,
-    });
-
-    if (!teacher) {
-      const error = new Error(
-        `Teacher not found with userId ${currentUserId}`
-      );
-      error.statusCode = 404;
-      throw error;
-    }
-
-    const organizationAdmin = await OrganizationAdmin.findOne({
-      organizationAdminId: newUserId,
-    });
-
-    if (!organizationAdmin) {
-      const error = new Error(
-        `Organization Admin not found with organizationAdminId ${newUserId}`
-      );
-      error.statusCode = 404;
-      throw error;
-    }
-
-    teacher.organizationAdminId =
-      organizationAdmin.organizationAdminId;
-
-    teacher.organizationId =
-      organizationAdmin.organizationId;
-
-    teacher.adminId =
-      organizationAdmin.adminId;
-
-    teacher.zonalAdminId =
-      organizationAdmin.zonalAdminId;
-
-    await teacher.save();
-
-    return {
-      flag: numericFlag,
-      userId: currentUserId,
-      updatedUserId: newUserId,
-      type: "Teacher",
-      data: teacher,
-    };
-  }
-
-  const error = new Error(
-    "Relation update is supported only for flag 7, 1, and 3"
-  );
-  error.statusCode = 400;
-  throw error;
-};
-
-
-const googleOAuthClient = new OAuth2Client();
+  res.status(200).json({
+    success: true,
+    message: "User relation updated successfully",
+    data: result,
+  });
+});
