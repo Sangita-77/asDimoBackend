@@ -32,6 +32,7 @@ export const createAppointment = async (data) => {
     time: data.time,
     status: data.status || "approved",
     // status: data.status || "pending",
+    paymentId: data.paymentId,
     zoomLink: availability.zoomLink,
   });
 

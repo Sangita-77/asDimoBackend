@@ -2,12 +2,12 @@ import { asyncHandler } from "../utils/asyncHandler.js";
 import * as appointmentsService from "../services/appointments.service.js";
 
 export const createAppointment = asyncHandler(async (req, res) => {
-    const {teacherId , date , time , parentId } = req.body;
+    const {teacherId , date , time , parentId , paymentId } = req.body;
 
-  if (!teacherId || !date || !time || !parentId) {
+  if (!teacherId || !date || !time || !parentId || !paymentId) {
     return res.status(400).json({
       success: false,
-      message: "Please provide all required fields: teacherId, date, time, parentId",
+      message: "Please provide all required fields: teacherId, date, time, parentId, paymentId",
     });
   }
   const appointment = await appointmentsService.createAppointment(req.body);

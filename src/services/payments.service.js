@@ -165,12 +165,82 @@ export const verifyRazorpayPayment = async ({
 /**
  * Handle incoming Razorpay webhooks
  */
+// export const handlePaymentWebhook = async (body, signature) => {
+//   // If webhook secret configured, verify webhook signature
+//   if (env.RAZORPAY_WEBHOOK_SECRET && signature) {
+//     const expectedSignature = crypto
+//       .createHmac("sha256", env.RAZORPAY_WEBHOOK_SECRET)
+//       .update(typeof body === "string" ? body : JSON.stringify(body))
+//       .digest("hex");
+
+//     if (expectedSignature !== signature) {
+//       const error = new Error("Invalid Razorpay webhook signature");
+//       error.statusCode = 400;
+//       throw error;
+//     }
+//   }
+
+//   const payload = typeof body === "string" ? JSON.parse(body) : body;
+//   const event = payload?.event;
+//   const entity = payload?.payload?.payment?.entity || payload?.payload?.order?.entity;
+
+//   if (event === "payment.captured" || event === "order.paid") {
+//     const orderId = entity?.order_id || entity?.id;
+//     const paymentId = entity?.id;
+
+//     if (orderId) {
+//       await Payment.findOneAndUpdate(
+//         { orderId },
+//         {
+//           status: "completed",
+//           ...(paymentId ? { razorpayPaymentId: paymentId } : {}),
+//           metadata: { webhookEvent: payload },
+//         },
+//         { new: true }
+//       );
+//     }
+//   } else if (event === "payment.failed") {
+//     const orderId = entity?.order_id;
+//     if (orderId) {
+//       await Payment.findOneAndUpdate(
+//         { orderId },
+//         {
+//           status: "failed",
+//           metadata: { webhookEvent: payload, error: entity?.error_description },
+//         },
+//         { new: true }
+//       );
+//     }
+//   } else if (event === "refund.processed") {
+//     const refundEntity = payload?.payload?.refund?.entity;
+//     const paymentId = refundEntity?.payment_id;
+//     if (paymentId) {
+//       await Payment.findOneAndUpdate(
+//         { razorpayPaymentId: paymentId },
+//         {
+//           status: "refunded",
+//           refundId: refundEntity?.id,
+//           refundAmount: refundEntity?.amount ? refundEntity.amount / 100 : undefined,
+//           metadata: { webhookEvent: payload },
+//         },
+//         { new: true }
+//       );
+//     }
+//   }
+
+//   return { received: true, event };
+// };
+
+
 export const handlePaymentWebhook = async (body, signature) => {
-  // If webhook secret configured, verify webhook signature
   if (env.RAZORPAY_WEBHOOK_SECRET && signature) {
     const expectedSignature = crypto
       .createHmac("sha256", env.RAZORPAY_WEBHOOK_SECRET)
-      .update(typeof body === "string" ? body : JSON.stringify(body))
+      .update(
+        typeof body === "string"
+          ? body
+          : JSON.stringify(body)
+      )
       .digest("hex");
 
     if (expectedSignature !== signature) {
@@ -180,57 +250,104 @@ export const handlePaymentWebhook = async (body, signature) => {
     }
   }
 
-  const payload = typeof body === "string" ? JSON.parse(body) : body;
-  const event = payload?.event;
-  const entity = payload?.payload?.payment?.entity || payload?.payload?.order?.entity;
+  const payload =
+    typeof body === "string"
+      ? JSON.parse(body)
+      : body;
 
-  if (event === "payment.captured" || event === "order.paid") {
-    const orderId = entity?.order_id || entity?.id;
-    const paymentId = entity?.id;
+  const event = payload?.event;
+
+  const paymentEntity =
+    payload?.payload?.payment?.entity;
+
+  const orderEntity =
+    payload?.payload?.order?.entity;
+
+  if (event === "payment.captured") {
+    const orderId = paymentEntity?.order_id;
+    const paymentId = paymentEntity?.id;
 
     if (orderId) {
       await Payment.findOneAndUpdate(
         { orderId },
         {
           status: "completed",
-          ...(paymentId ? { razorpayPaymentId: paymentId } : {}),
-          metadata: { webhookEvent: payload },
-        },
-        { new: true }
-      );
-    }
-  } else if (event === "payment.failed") {
-    const orderId = entity?.order_id;
-    if (orderId) {
-      await Payment.findOneAndUpdate(
-        { orderId },
-        {
-          status: "failed",
-          metadata: { webhookEvent: payload, error: entity?.error_description },
-        },
-        { new: true }
-      );
-    }
-  } else if (event === "refund.processed") {
-    const refundEntity = payload?.payload?.refund?.entity;
-    const paymentId = refundEntity?.payment_id;
-    if (paymentId) {
-      await Payment.findOneAndUpdate(
-        { razorpayPaymentId: paymentId },
-        {
-          status: "refunded",
-          refundId: refundEntity?.id,
-          refundAmount: refundEntity?.amount ? refundEntity.amount / 100 : undefined,
-          metadata: { webhookEvent: payload },
+          ...(paymentId
+            ? { razorpayPaymentId: paymentId }
+            : {}),
+          metadata: {
+            webhookEvent: payload,
+          },
         },
         { new: true }
       );
     }
   }
 
-  return { received: true, event };
-};
+  else if (event === "order.paid") {
+    const orderId = orderEntity?.id;
 
+    if (orderId) {
+      await Payment.findOneAndUpdate(
+        { orderId },
+        {
+          status: "completed",
+          metadata: {
+            webhookEvent: payload,
+          },
+        },
+        { new: true }
+      );
+    }
+  }
+
+  else if (event === "payment.failed") {
+    const orderId = paymentEntity?.order_id;
+
+    if (orderId) {
+      await Payment.findOneAndUpdate(
+        { orderId },
+        {
+          status: "failed",
+          metadata: {
+            webhookEvent: payload,
+            error: paymentEntity?.error_description,
+          },
+        },
+        { new: true }
+      );
+    }
+  }
+
+  else if (event === "refund.processed") {
+    const refundEntity =
+      payload?.payload?.refund?.entity;
+
+    const paymentId = refundEntity?.payment_id;
+
+    if (paymentId) {
+      await Payment.findOneAndUpdate(
+        { razorpayPaymentId: paymentId },
+        {
+          status: "refunded",
+          refundId: refundEntity?.id,
+          refundAmount: refundEntity?.amount
+            ? refundEntity.amount / 100
+            : undefined,
+          metadata: {
+            webhookEvent: payload,
+          },
+        },
+        { new: true }
+      );
+    }
+  }
+
+  return {
+    received: true,
+    event,
+  };
+};
 /**
  * Refund a payment by ID via Razorpay API and DB update
  */

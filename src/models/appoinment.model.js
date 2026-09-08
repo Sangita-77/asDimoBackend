@@ -41,7 +41,12 @@ const appoinmentSchema = new mongoose.Schema(
 
       reason: {
         type: String,
-        required: true,
+        default: "payment done",
+      },
+
+      paymentId: {
+        type: String,
+        required: false,
       },
   
       zoomLink: String,
