@@ -128,7 +128,7 @@ export const createAppointment = async (data) => {
 };
 
 export const getAppointments = async () => {
-  const appointments = await Appointment.find().lean();
+  const appointments = await Appointment.find().sort({ createdAt: -1 }).lean();
 
   const enrichedAppointments = await Promise.all(
     appointments.map(async (appointment) => {

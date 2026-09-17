@@ -51,6 +51,25 @@ const createRefreshTokenRecord = async (userId, userObjectId) => {
   return refreshToken;
 };
 
+const issueSocialAuthTokens = async (user, registration) => {
+  const accessToken = generateAccessToken(user._id.toString());
+  const refreshToken = await createRefreshTokenRecord(user._id.toString(), user._id);
+  user.lastLogin = new Date();
+  await user.save();
+
+  const userObject = user.toObject();
+  delete userObject.password;
+
+  return {
+    user: userObject,
+    token: accessToken,
+    accessToken,
+    refreshToken,
+    generatedPassword: registration.generatedPassword,
+    role: registration.role,
+  };
+};
+
 const toPositiveNumber = (value, fieldName) => {
   const number = Number(value);
   if (!Number.isFinite(number) || number <= 0) {
@@ -163,8 +182,17 @@ const getRoleParents = async (flag, userData) => {
   return parents;
 };
 
-const generateReferralCode = (length = 6) => {
+const generateReferralCode = (name, length = 6) => {
   const chars = "ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789";
+
+  // Get first 3 letters from name
+  const prefix = name
+    .trim()
+    .replace(/[^a-zA-Z]/g, "")
+    .substring(0, 3)
+    .toUpperCase()
+    .padEnd(3, "X");
+
   let code = "";
 
   for (let i = 0; i < length; i++) {
@@ -173,8 +201,21 @@ const generateReferralCode = (length = 6) => {
     );
   }
 
-  return code;
+  return `${prefix}${code}`;
 };
+
+// const generateReferralCode = (length = 6) => {
+//   const chars = "ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789";
+//   let code = "";
+
+//   for (let i = 0; i < length; i++) {
+//     code += chars.charAt(
+//       Math.floor(Math.random() * chars.length)
+//     );
+//   }
+
+//   return code;
+// };
 
 
 export const registerUser = async (userData) => {
@@ -192,7 +233,8 @@ export const registerUser = async (userData) => {
   let exists;
 
   do {
-    referralCode = generateReferralCode(6);
+    // referralCode = generateReferralCode(6);
+      referralCode = generateReferralCode(userData.name, 6);
 
     exists = await User.findOne({
       referralCode,
@@ -872,6 +914,67 @@ export const loginWithGoogle = async (idToken) => {
   };
 };
 
+export const signupWithGoogle = async (idToken, userData) => {
+  if (typeof idToken !== "string" || !idToken.trim()) {
+    const error = new Error("Google ID token is required");
+    error.statusCode = 400;
+    throw error;
+  }
+
+  if (!Array.isArray(env.GOOGLE_CLIENT_IDS) || env.GOOGLE_CLIENT_IDS.length === 0) {
+    const error = new Error("Google signup is not configured");
+    error.statusCode = 503;
+    throw error;
+  }
+
+  let payload;
+  try {
+    const ticket = await googleOAuthClient.verifyIdToken({
+      idToken: idToken.trim(),
+      audience: env.GOOGLE_CLIENT_IDS,
+    });
+    payload = ticket.getPayload();
+  } catch {
+    const error = new Error("Invalid Google ID token");
+    error.statusCode = 401;
+    throw error;
+  }
+
+  if (!payload?.email || payload.email_verified !== true || !payload.sub) {
+    const error = new Error("Google account email is not verified");
+    error.statusCode = 401;
+    throw error;
+  }
+
+  const email = payload.email.toLowerCase().trim();
+  const existingUser = await User.findOne({
+    $or: [{ email }, { googleId: payload.sub }],
+  });
+  if (existingUser) {
+    const error = new Error("An AsDimo account already exists for this Google account");
+    error.statusCode = 409;
+    throw error;
+  }
+
+  const registration = await registerUser({
+    ...userData,
+    name: userData.name || payload.name || email.split("@")[0],
+    email,
+  });
+
+  const user = await User.findById(registration.user._id);
+  user.googleId = payload.sub;
+  user.authProvider = "google";
+  user.googleProfile = {
+    name: payload.name || null,
+    picture: payload.picture || null,
+    email,
+  };
+  await user.save();
+
+  return issueSocialAuthTokens(user, registration);
+};
+
 export const loginWithFacebook = async (accessToken) => {
   if (typeof accessToken !== "string" || !accessToken.trim()) {
     const error = new Error("Facebook access token is required");
@@ -1002,6 +1105,88 @@ export const loginWithFacebook = async (accessToken) => {
     accessToken: appJwt,
     refreshToken,
   };
+};
+
+export const signupWithFacebook = async (accessToken, userData) => {
+  if (typeof accessToken !== "string" || !accessToken.trim()) {
+    const error = new Error("Facebook access token is required");
+    error.statusCode = 400;
+    throw error;
+  }
+
+  if (!env.FACEBOOK_APP_ID || !env.FACEBOOK_APP_SECRET) {
+    const error = new Error("Facebook signup is not configured");
+    error.statusCode = 503;
+    throw error;
+  }
+
+  const graphBaseUrl = `https://graph.facebook.com/${env.FACEBOOK_GRAPH_API_VERSION}`;
+  const appAccessToken = `${env.FACEBOOK_APP_ID}|${env.FACEBOOK_APP_SECRET}`;
+  let facebookUser;
+  try {
+    const debugResponse = await axios.get(`${graphBaseUrl}/debug_token`, {
+      params: { input_token: accessToken.trim(), access_token: appAccessToken },
+    });
+    const tokenData = debugResponse.data?.data;
+    if (!tokenData?.is_valid || String(tokenData.app_id) !== env.FACEBOOK_APP_ID || !tokenData.user_id) {
+      const error = new Error("Facebook access token is invalid, expired, or belongs to a different Facebook app");
+      error.statusCode = 401;
+      throw error;
+    }
+
+    const profileResponse = await axios.get(`${graphBaseUrl}/me`, {
+      params: {
+        fields: "id,name,email,picture.type(large)",
+        access_token: accessToken.trim(),
+      },
+    });
+    facebookUser = profileResponse.data;
+    if (String(facebookUser?.id) !== String(tokenData.user_id)) {
+      const error = new Error("Facebook token profile does not match the validated user");
+      error.statusCode = 401;
+      throw error;
+    }
+  } catch (caughtError) {
+    if (caughtError.statusCode) throw caughtError;
+    const error = new Error("Facebook access token could not be verified");
+    error.statusCode = 401;
+    throw error;
+  }
+
+  const facebookId = String(facebookUser.id);
+  const email = typeof facebookUser.email === "string"
+    ? facebookUser.email.toLowerCase().trim()
+    : null;
+  if (!email) {
+    const error = new Error("Facebook did not provide an email address");
+    error.statusCode = 400;
+    throw error;
+  }
+
+  const existingUser = await User.findOne({ $or: [{ email }, { facebookId }] });
+  if (existingUser) {
+    const error = new Error("An AsDimo account already exists for this Facebook account");
+    error.statusCode = 409;
+    throw error;
+  }
+
+  const registration = await registerUser({
+    ...userData,
+    name: userData.name || facebookUser.name || email.split("@")[0],
+    email,
+  });
+
+  const user = await User.findById(registration.user._id);
+  user.facebookId = facebookId;
+  user.authProvider = "facebook";
+  user.facebookProfile = {
+    name: facebookUser.name || null,
+    picture: facebookUser.picture?.data?.url || null,
+    email,
+  };
+  await user.save();
+
+  return issueSocialAuthTokens(user, registration);
 };
 
 const withCount = (data) => ({

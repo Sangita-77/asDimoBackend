@@ -3,6 +3,8 @@ import {
   loginUser,
   loginWithGoogle,
   loginWithFacebook,
+  signupWithGoogle,
+  signupWithFacebook,
   getUserById,
   getAllUsersService,
   logoutUser,
@@ -282,6 +284,44 @@ export const facebookLogin = asyncHandler(async (req, res) => {
     success: true,
     message: "Facebook login successful",
     data: { user, token, accessToken: appAccessToken, refreshToken },
+  });
+});
+
+export const googleSignup = asyncHandler(async (req, res) => {
+  const { idToken, ...userData } = req.body || {};
+
+  if (!userData.flag && userData.flag !== 0) {
+    return res.status(400).json({
+      success: false,
+      message: "flag is required for social signup",
+    });
+  }
+
+  const result = await signupWithGoogle(idToken, userData);
+
+  res.status(201).json({
+    success: true,
+    message: "Google signup successful",
+    data: result,
+  });
+});
+
+export const facebookSignup = asyncHandler(async (req, res) => {
+  const { accessToken, ...userData } = req.body || {};
+
+  if (!userData.flag && userData.flag !== 0) {
+    return res.status(400).json({
+      success: false,
+      message: "flag is required for social signup",
+    });
+  }
+
+  const result = await signupWithFacebook(accessToken, userData);
+
+  res.status(201).json({
+    success: true,
+    message: "Facebook signup successful",
+    data: result,
   });
 });
 

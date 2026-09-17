@@ -208,6 +208,35 @@ Response:
   "message": "Password updated successfully"
 }
 ```
+---
+### POST /auth/googleSignup and POST /auth/facebookSignup
+
+Create a new AsDimo account from a verified Google ID token or Facebook user
+access token. The request must include `flag` and any role-specific fields
+required by `/auth/register` (for example, `therapistId` or `referralCode` for
+a parent). The provider token supplies the email and profile identity.
+
+Google request body:
+```json
+{
+  "idToken": "<google-id-token>",
+  "flag": 2,
+  "referralCode": "ABC123"
+}
+```
+
+Facebook request body:
+```json
+{
+  "accessToken": "<facebook-user-access-token>",
+  "flag": 2,
+  "therapistId": 123
+}
+```
+
+Both endpoints return `201` with the created user and the normal application
+`token`, `accessToken`, and `refreshToken`. They return `409` when an account
+already exists for the provider identity or verified email.
 
 ---
 

@@ -38,6 +38,8 @@ authRouter.post(
 authRouter.post("/login", authController.login);
 authRouter.post("/googleLogin", authController.googleLogin);
 authRouter.post("/facebookLogin", authController.facebookLogin);
+authRouter.post("/googleSignup", authController.googleSignup);
+authRouter.post("/facebookSignup", authController.facebookSignup);
 authRouter.post("/refresh-token", authController.refreshToken);
 authRouter.post("/logout", authenticate, protect, authController.logout);
 authRouter.post("/forgot-password", authController.forgotPassword);
