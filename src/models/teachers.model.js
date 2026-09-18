@@ -80,6 +80,16 @@ const teacherSchema = new mongoose.Schema(
       default: null,
       trim: true,
     },
+    languages: {
+      type: [String],
+      default: [],
+      trim: true,
+    },
+    cliniqueName: {
+      type: String,
+      default: null,
+      trim: true,
+    },
 
   },
   { timestamps: true }

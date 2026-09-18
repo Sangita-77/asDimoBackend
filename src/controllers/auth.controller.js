@@ -53,6 +53,9 @@ export const register = asyncHandler(async (req, res) => {
     country,
     org_name,
     therapist_category,
+    yearsOfExperience,
+    languages,
+    cliniqueName,
   } = req.body;
 
   // console.log("BODY =>", req.body);
@@ -211,6 +214,9 @@ export const register = asyncHandler(async (req, res) => {
     profileImg,
     org_name: generatedOrgName,
     therapist_category,
+    yearsOfExperience,
+    languages,
+    cliniqueName,
   });
 
   res.status(201).json({

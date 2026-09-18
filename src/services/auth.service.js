@@ -434,6 +434,9 @@ export const registerUser = async (userData) => {
                 zonalAdminId: parents.organizationAdmin.zonalAdminId,
                 adminId: parents.organizationAdmin.adminId,
                 therapist_category: userData.therapist_category,
+                yearsOfExperience: userData.yearsOfExperience,
+                languages: userData.languages,
+                cliniqueName: userData.cliniqueName,
               },
             ],
             { session }
@@ -475,6 +478,9 @@ export const registerUser = async (userData) => {
                 zonalAdminId: organizationAdmin[0].zonalAdminId,
                 adminId: organizationAdmin[0].adminId,
                 therapist_category: userData.therapist_category,
+                yearsOfExperience: userData.yearsOfExperience,
+                languages: userData.languages,
+                cliniqueName: userData.cliniqueName,
               },
             ],
             { session }
@@ -602,6 +608,9 @@ export const registerUser = async (userData) => {
               zonalAdminId: flag === 3 ? parents.organizationAdmin.zonalAdminId : null,
               adminId: flag === 3 ? parents.organizationAdmin.adminId : null,
               therapist_category: userData.therapist_category,
+              yearsOfExperience: userData.yearsOfExperience,
+              languages: userData.languages,
+              cliniqueName: userData.cliniqueName,
             });
           } else if (flag === 5) {
             const organizationAdmin = await OrganizationAdmin.create({
@@ -630,6 +639,9 @@ export const registerUser = async (userData) => {
                 zonalAdminId: organizationAdmin.zonalAdminId,
                 adminId: organizationAdmin.adminId,
                 therapist_category: userData.therapist_category,
+                yearsOfExperience: userData.yearsOfExperience,
+                languages: userData.languages,
+                cliniqueName: userData.cliniqueName,
               }
             );
         } else if (flag === 6) {
@@ -665,7 +677,22 @@ export const registerUser = async (userData) => {
             throw error;
           }
         } catch (roleErr) {
-          await User.deleteOne({ _id: user._id });
+            // Remove role documents created before the failure
+          if (flag === 5) {
+            await OrganizationAdmin.deleteOne({
+              userId: user.userId,
+            });
+
+            await Teacher.deleteOne({
+              userId: user.userId,
+            });
+          }
+
+          // Remove User
+          await User.deleteOne({
+            _id: user._id,
+          });
+
           throw roleErr;
         }
       } else {
@@ -2387,9 +2414,12 @@ export const getUserById = async (userId) => {
 export const updateProfileById = async (
   userId,
   profileData
-  ) => {
-
+) => {
   const allowedUpdates = {};
+
+  // =========================
+  // USER PROFILE FIELDS
+  // =========================
 
   if (profileData.name !== undefined) {
     allowedUpdates.name = profileData.name;
@@ -2400,37 +2430,39 @@ export const updateProfileById = async (
   }
 
   if (profileData.profileImg !== undefined) {
-    allowedUpdates.profileImg =
-      profileData.profileImg;
+    allowedUpdates.profileImg = profileData.profileImg;
   }
+
   if (profileData.phone !== undefined) {
     allowedUpdates.phone = profileData.phone;
   }
+
   if (profileData.city !== undefined) {
     allowedUpdates.city = profileData.city;
   }
+
   if (profileData.state !== undefined) {
     allowedUpdates.state = profileData.state;
   }
+
   if (profileData.pincode !== undefined) {
     allowedUpdates.pincode = profileData.pincode;
   }
+
   if (profileData.address !== undefined) {
     allowedUpdates.address = profileData.address;
   }
+
   if (profileData.country !== undefined) {
     allowedUpdates.country = profileData.country;
   }
 
-  const user = await User.findByIdAndUpdate(
-    userId,
-    allowedUpdates,
-    {
-      returnDocument: "after",
-      runValidators: true,
-      context: "query",
-    }
-  ).select("-password");
+  // =========================
+  // FIND USER
+  // =========================
+
+  const user = await User.findById(userId)
+    .select("-password");
 
   if (!user) {
     const error = new Error("User not found");
@@ -2438,8 +2470,133 @@ export const updateProfileById = async (
     throw error;
   }
 
-  return user;
+  // =========================
+  // UPDATE USER
+  // =========================
+
+  if (Object.keys(allowedUpdates).length > 0) {
+    await User.findByIdAndUpdate(
+      userId,
+      allowedUpdates,
+      {
+        returnDocument: "after",
+        runValidators: true,
+        context: "query",
+      }
+    );
+  }
+
+  // =========================
+  // UPDATE TEACHER
+  // =========================
+
+  const teacherUpdates = {};
+
+  if (profileData.yearsOfExperience !== undefined) {
+    teacherUpdates.yearsOfExperience =
+      Number(profileData.yearsOfExperience);
+  }
+
+  if (profileData.therapist_category !== undefined) {
+    teacherUpdates.therapist_category =
+      profileData.therapist_category;
+  }
+
+  if (profileData.languages !== undefined) {
+    teacherUpdates.languages =
+      Array.isArray(profileData.languages)
+        ? profileData.languages
+        : String(profileData.languages)
+            .split(",")
+            .map((lang) => lang.trim())
+            .filter(Boolean);
+  }
+
+  if (profileData.cliniqueName !== undefined) {
+    teacherUpdates.cliniqueName =
+      profileData.cliniqueName;
+  }
+
+  // Only update Teacher when Teacher fields are present
+  if (Object.keys(teacherUpdates).length > 0) {
+    await Teacher.findOneAndUpdate(
+      {
+        userId: user.userId,
+      },
+      teacherUpdates,
+      {
+        new: true,
+        runValidators: true,
+      }
+    );
+  }
+
+  // =========================
+  // RETURN UPDATED USER
+  // =========================
+
+  const updatedUser = await User.findById(userId)
+    .select("-password");
+
+  return updatedUser;
 };
+
+// export const updateProfileById = async (
+//   userId,
+//   profileData
+//   ) => {
+
+//   const allowedUpdates = {};
+
+//   if (profileData.name !== undefined) {
+//     allowedUpdates.name = profileData.name;
+//   }
+
+//   if (profileData.email !== undefined) {
+//     allowedUpdates.email = profileData.email;
+//   }
+
+//   if (profileData.profileImg !== undefined) {
+//     allowedUpdates.profileImg =
+//       profileData.profileImg;
+//   }
+//   if (profileData.phone !== undefined) {
+//     allowedUpdates.phone = profileData.phone;
+//   }
+//   if (profileData.city !== undefined) {
+//     allowedUpdates.city = profileData.city;
+//   }
+//   if (profileData.state !== undefined) {
+//     allowedUpdates.state = profileData.state;
+//   }
+//   if (profileData.pincode !== undefined) {
+//     allowedUpdates.pincode = profileData.pincode;
+//   }
+//   if (profileData.address !== undefined) {
+//     allowedUpdates.address = profileData.address;
+//   }
+//   if (profileData.country !== undefined) {
+//     allowedUpdates.country = profileData.country;
+//   }
+
+//   const user = await User.findByIdAndUpdate(
+//     userId,
+//     allowedUpdates,
+//     {
+//       returnDocument: "after",
+//       runValidators: true,
+//       context: "query",
+//     }
+//   ).select("-password");
+
+//   if (!user) {
+//     const error = new Error("User not found");
+//     error.statusCode = 404;
+//     throw error;
+//   }
+
+//   return user;
+// };
 
 // export const getAllUsersService = async (flag) => {
 //   const users = await User.find({ flag }).select("-password");
