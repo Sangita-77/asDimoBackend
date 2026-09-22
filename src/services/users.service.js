@@ -1,4 +1,5 @@
 import User from "../models/user.model.js";
+import RefreshToken from "../models/refreshToken.model.js";
 
 const generateRandomPassword = (length = 10) => {
   const chars = "ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz23456789";
@@ -72,6 +73,9 @@ export const deleteUserById = async (id) => {
     error.statusCode = 404;
     throw error;
   }
+
+  await RefreshToken.deleteMany({ user: user._id });
+
   return user;
 };
 

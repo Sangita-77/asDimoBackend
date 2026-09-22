@@ -131,3 +131,25 @@ export const getAppointmentsById = asyncHandler(async (req, res) => {
     data: appointments,
   });
 });
+
+export const getAppointmentsForParent = asyncHandler(async (req, res) => {
+  const {
+    parentId,
+    search = "",
+    sortBy = "",
+    sortOrder = "asc",
+  } = req.body;
+
+  const appointments = await appointmentsService.getAppointmentsForParent({
+    parentId,
+    search,
+    sortBy,
+    sortOrder,
+  });
+
+  res.status(200).json({
+    success: true,
+    message: "Appointments retrieved successfully",
+    data: appointments,
+  });
+});

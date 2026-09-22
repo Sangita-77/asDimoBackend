@@ -985,3 +985,82 @@ export const appointmentsByIdService = async ({
 
   return enrichedAppointments;
 };
+
+export const getAppointmentsForParent = async ({
+  parentId,
+  search = "",
+  sortBy = "",
+  sortOrder = "asc",
+}) => {
+  const query = {};
+
+  // Filter appointments by parentId
+  if (parentId) {
+    query.parentId = parentId;
+  }
+
+  const appointments = await Appointment.find(query)
+    .sort({ createdAt: -1 })
+    .lean();
+
+  const enrichedAppointments = await Promise.all(
+    appointments.map(async (appointment) => {
+      const [teacher, parent] = await Promise.all([
+        Teacher.findOne({ userId: appointment.teacherId }).lean(),
+        Parent.findOne({ userId: appointment.parentId }).lean(),
+      ]);
+
+      let teacherUser = null;
+      let parentUser = null;
+      let organization = null;
+      let zonalAdmin = null;
+      let admin = null;
+
+      if (teacher) {
+        teacherUser = await User.findOne({
+          userId: teacher.userId,
+        })
+          .select("-password")
+          .lean();
+      }
+
+      if (parent) {
+        [
+          parentUser,
+          organization,
+          zonalAdmin,
+          admin,
+        ] = await Promise.all([
+          User.findOne({ userId: parent.userId })
+            .select("-password")
+            .lean(),
+
+          User.findOne({ userId: parent.organizationId })
+            .select("-password")
+            .lean(),
+
+          User.findOne({ userId: parent.zonalAdminId })
+            .select("-password")
+            .lean(),
+
+          User.findOne({ userId: parent.adminId })
+            .select("-password")
+            .lean(),
+        ]);
+      }
+
+      return {
+        ...appointment,
+        teacher,
+        teacherUser,
+        parent,
+        parentUser,
+        organization,
+        zonalAdmin,
+        admin,
+      };
+    })
+  );
+
+  return enrichedAppointments;
+};

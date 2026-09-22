@@ -79,6 +79,7 @@ appointmentsRouter.patch("/reschedule/:id", authenticate, protect, appointmentsC
 appointmentsRouter.patch("/cancel/:id", authenticate, protect, appointmentsController.cancelAppointment);
 appointmentsRouter.patch("/complete/:id", authenticate, protect, appointmentsController.completeAppointment);
 appointmentsRouter.get("/available-slots/:doctorId", authenticate, protect, appointmentsController.getAvailableSlots);
+appointmentsRouter.post("/getAppointmentsForParent",authenticate,protect,appointmentsController.getAppointmentsForParent);
 router.use("/appointments", appointmentsRouter);
 
 

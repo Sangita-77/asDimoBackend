@@ -3483,6 +3483,7 @@ const deleteUserById = async (userId, session) => {
     throw new Error("Invalid flag");
   }
 
+  await RefreshToken.deleteMany({ user: user._id }).session(session);
   await User.deleteOne({ _id: userId }).session(session);
 };
 
