@@ -114,23 +114,23 @@ export const getAvailableSlots = asyncHandler(async (req, res) => {
   });
 });
 
-export const getAppointmentsById = asyncHandler(async (req, res) => {
-  const { search = "", sortBy = "", sortOrder = "asc" } = req.query;
-  const { parentId } = req.body;
+// export const getAppointmentsById = asyncHandler(async (req, res) => {
+//   const { search = "", sortBy = "", sortOrder = "asc" } = req.query;
+//   const { parentId } = req.body;
 
-  const appointments = await appointmentsService.appointmentsByIdService({
-    search,
-    sortBy,
-    sortOrder,
-    parentId,
-  });
+//   const appointments = await appointmentsService.appointmentsByIdService({
+//     search,
+//     sortBy,
+//     sortOrder,
+//     parentId,
+//   });
 
-  res.status(200).json({
-    success: true,
-    message: "Appointments retrieved successfully",
-    data: appointments,
-  });
-});
+//   res.status(200).json({
+//     success: true,
+//     message: "Appointments retrieved successfully",
+//     data: appointments,
+//   });
+// });
 
 export const getAppointmentsForParent = asyncHandler(async (req, res) => {
   const {
@@ -146,6 +146,25 @@ export const getAppointmentsForParent = asyncHandler(async (req, res) => {
     sortBy,
     sortOrder,
   });
+
+  res.status(200).json({
+    success: true,
+    message: "Appointments retrieved successfully",
+    data: appointments,
+  });
+});
+
+export const getAppointmentsById = asyncHandler(async (req, res) => {
+  const { search = "", sortBy = "", sortOrder = "asc" } = req.query;
+  const { parentId } = req.body;
+
+  const appointments =
+    await appointmentsService.appointmentsByIdService({
+      search,
+      sortBy,
+      sortOrder,
+      parentId,
+    });
 
   res.status(200).json({
     success: true,
