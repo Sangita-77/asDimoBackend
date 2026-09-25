@@ -22,6 +22,7 @@ import {
   getQuestionAnswerService,
   updateQuestionAnswerService,
   updateUserRelationService,
+  authenticateWithGoogle,
 } from "../services/auth.service.js";
 import {
   sendEmailOtp,
@@ -851,6 +852,30 @@ export const updateUserRelation = asyncHandler(async (req, res) => {
   res.status(200).json({
     success: true,
     message: "User relation updated successfully",
+    data: result,
+  });
+});
+
+export const googleAuth = asyncHandler(async (req, res) => {
+  const { idToken, ...userData } = req.body || {};
+
+  if (typeof idToken !== "string" || !idToken.trim()) {
+    return res.status(400).json({
+      success: false,
+      message: "Google ID token is required",
+    });
+  }
+
+  const result = await authenticateWithGoogle(
+    idToken.trim(),
+    userData
+  );
+
+  res.status(200).json({
+    success: true,
+    message: result.isNewUser
+      ? "Google registration and login successful"
+      : "Google login successful",
     data: result,
   });
 });

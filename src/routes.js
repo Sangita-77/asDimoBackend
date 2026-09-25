@@ -36,7 +36,8 @@ authRouter.post(
   authController.register
 );
 authRouter.post("/login", authController.login);
-authRouter.post("/googleLogin", authController.googleLogin);
+// authRouter.post("/googleLogin", authController.googleLogin);
+authRouter.post("/googleLogin", authController.googleAuth);
 authRouter.post("/facebookLogin", authController.facebookLogin);
 authRouter.post("/googleSignup", authController.googleSignup);
 authRouter.post("/facebookSignup", authController.facebookSignup);
