@@ -4156,5 +4156,229 @@ export const updateUserRelationService = async ({flag,userId,updatedUserId}) => 
   throw error;
 };
 
+export const authenticateWithGoogle = async (
+  idToken,
+  userData = {}
+) => {
+  // --------------------------------------------------
+  // 1. Validate ID token
+  // --------------------------------------------------
+
+  if (typeof idToken !== "string" || !idToken.trim()) {
+    const error = new Error("Google ID token is required");
+    error.statusCode = 400;
+    throw error;
+  }
+
+  // --------------------------------------------------
+  // 2. Check Google configuration
+  // --------------------------------------------------
+
+  if (
+    !Array.isArray(env.GOOGLE_CLIENT_IDS) ||
+    env.GOOGLE_CLIENT_IDS.length === 0
+  ) {
+    const error = new Error(
+      "Google authentication is not configured"
+    );
+    error.statusCode = 503;
+    throw error;
+  }
+
+  // --------------------------------------------------
+  // 3. Verify Google ID token
+  // --------------------------------------------------
+
+  let payload;
+
+  try {
+    const ticket = await googleOAuthClient.verifyIdToken({
+      idToken: idToken.trim(),
+      audience: env.GOOGLE_CLIENT_IDS,
+    });
+
+    payload = ticket.getPayload();
+  } catch {
+    const error = new Error("Invalid Google ID token");
+    error.statusCode = 401;
+    throw error;
+  }
+
+  // --------------------------------------------------
+  // 4. Validate Google account
+  // --------------------------------------------------
+
+  if (
+    !payload?.email ||
+    payload.email_verified !== true ||
+    !payload.sub
+  ) {
+    const error = new Error(
+      "Google account email is not verified"
+    );
+    error.statusCode = 401;
+    throw error;
+  }
+
+  const googleId = payload.sub;
+  const email = payload.email.toLowerCase().trim();
+
+  // --------------------------------------------------
+  // 5. Check whether user already exists
+  // --------------------------------------------------
+
+  const [userByGoogleId, userByEmail] = await Promise.all([
+    User.findOne({ googleId }).select("+password"),
+    User.findOne({ email }).select("+password"),
+  ]);
+
+  // Google ID and email belong to different accounts
+  if (
+    userByGoogleId &&
+    userByEmail &&
+    !userByGoogleId._id.equals(userByEmail._id)
+  ) {
+    const error = new Error(
+      "This Google account is already linked to another user"
+    );
+    error.statusCode = 409;
+    throw error;
+  }
+
+  // Existing user
+  let user = userByGoogleId || userByEmail;
+
+  let isNewUser = false;
+  let registration = null;
+
+  // --------------------------------------------------
+  // 6. User does NOT exist -> register
+  // --------------------------------------------------
+
+  if (!user) {
+    isNewUser = true;
+
+    /*
+     * If your registerUser requires flag,
+     * send it from frontend.
+     *
+     * Here 4 is only an example/default.
+     * Change this according to your application.
+     */
+    const flag =
+      userData.flag !== undefined
+        ? userData.flag
+        : 4;
+
+    registration = await registerUser({
+      ...userData,
+
+      flag,
+
+      name:
+        userData.name ||
+        payload.name ||
+        email.split("@")[0],
+
+      email,
+    });
+
+    const createdUserId =
+      registration?.user?._id ||
+      registration?._id ||
+      registration?.user;
+
+    user = await User.findById(createdUserId);
+  }
+
+  // --------------------------------------------------
+  // 7. Make sure user exists
+  // --------------------------------------------------
+
+  if (!user) {
+    const error = new Error(
+      "Failed to authenticate user"
+    );
+    error.statusCode = 500;
+    throw error;
+  }
+
+  // --------------------------------------------------
+  // 8. Check account status
+  // --------------------------------------------------
+
+  if (user.status !== 1) {
+    const error = new Error(
+      "Your account is inactive. Please contact admin."
+    );
+    error.statusCode = 403;
+    throw error;
+  }
+
+  // --------------------------------------------------
+  // 9. Link Google account
+  // --------------------------------------------------
+
+  user.googleId = googleId;
+
+  user.authProvider = "google";
+
+  user.googleProfile = {
+    name: payload.name || null,
+    picture: payload.picture || null,
+    email,
+  };
+
+  user.lastLogin = new Date();
+
+  await user.save();
+
+  // --------------------------------------------------
+  // 10. Generate login tokens
+  // --------------------------------------------------
+
+  let accessToken;
+  let refreshToken;
+  let userObject;
+
+  /*
+   * For a newly registered user, use your existing
+   * social token function if registerUser returns
+   * the required registration information.
+   */
+  if (registration) {
+    const tokens = await issueSocialAuthTokens(
+      user,
+      registration
+    );
+
+    return {
+      ...tokens,
+      isNewUser: true,
+    };
+  }
+
+  // Existing user
+  accessToken = generateAccessToken(
+    user._id.toString()
+  );
+
+  refreshToken = await createRefreshTokenRecord(
+    user._id.toString(),
+    user._id
+  );
+
+  userObject = user.toObject();
+
+  delete userObject.password;
+
+  return {
+    user: userObject,
+    token: accessToken,
+    accessToken,
+    refreshToken,
+    isNewUser: false,
+  };
+};
 
 const googleOAuthClient = new OAuth2Client();
