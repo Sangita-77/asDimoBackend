@@ -3963,6 +3963,10 @@ export const updateUserRelationService = async ({flag,userId,updatedUserId}) => 
   const currentUserId = Number(userId);
   const newUserId = Number(updatedUserId);
 
+  // console.log("numericFlag.....................",numericFlag);
+  // console.log("currentUserId.....................",currentUserId);
+  // console.log("newUserId.....................",newUserId);
+
   if (!Number.isInteger(numericFlag)) {
     const error = new Error("Invalid flag");
     error.statusCode = 400;
@@ -3979,6 +3983,70 @@ export const updateUserRelationService = async ({flag,userId,updatedUserId}) => 
     const error = new Error("Invalid updatedUserId");
     error.statusCode = 400;
     throw error;
+  }
+
+  /*
+   * FLAG 0 & FLAG 6
+   *
+   * Existing Parent:
+   *   userId = current parent
+   *
+   * 1. parent.adminId = updatedUserId
+   *
+   * 2. Find Admin where:
+   *      Admin.userId === updatedUserId or adminId === updatedUserId
+   *
+   * 3. Get Admin.zonalAdminId
+   *
+   * 4. parent.zonalAdminId = Admin.zonalAdminId
+   */
+  if (numericFlag === 4) {
+    const parent = await Parent.findOne({
+      userId: currentUserId,
+    });
+
+    // console.log("parent.....................",parent);
+
+    if (!parent) {
+      const error = new Error(
+        `Parent not found with userId ${currentUserId}`
+      );
+      error.statusCode = 404;
+      throw error;
+    }
+
+    const admin = await Admin.findOne({
+      $or: [{ userId: newUserId }, { adminId: newUserId }],
+    });
+
+    if (!admin) {
+      const error = new Error(
+        `Admin not found with userId ${newUserId}`
+      );
+      error.statusCode = 404;
+      throw error;
+    }
+
+    if (!admin.zonalAdminId) {
+      const error = new Error(
+        `Admin with userId ${newUserId} does not have a zonalAdminId`
+      );
+      error.statusCode = 404;
+      throw error;
+    }
+
+    parent.adminId = newUserId;
+    parent.zonalAdminId = admin.zonalAdminId;
+
+    await parent.save();
+
+    return {
+      flag: numericFlag,
+      userId: currentUserId,
+      updatedUserId: newUserId,
+      type: "Parent",
+      data: parent,
+    };
   }
 
   /*
@@ -4150,7 +4218,7 @@ export const updateUserRelationService = async ({flag,userId,updatedUserId}) => 
   }
 
   const error = new Error(
-    "Relation update is supported only for flag 7, 1, and 3"
+    "Relation update is supported only for flag 0, 1, 3, 6, and 7"
   );
   error.statusCode = 400;
   throw error;

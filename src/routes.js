@@ -60,7 +60,7 @@ authRouter.post("/delete",authenticate,protect,authController.deleteUsersCon);
 authRouter.post("/getAllUsersById", authenticate, protect, authController.getAllUsersById);
 authRouter.post("/personalize", authenticate, protect, authController.saveQuestionAnswer);
 authRouter.post("/get-personalize", authenticate, protect, authController.getQuestionAnswer);
-authRouter.put("/updateUserRelation",authenticate,protect,authController.updateUserRelation);
+authRouter.put("/updateUserRelation1",authenticate,protect,authController.updateUserRelation);
 router.use("/auth", authRouter);
 
 const therapistsRouter = Router();

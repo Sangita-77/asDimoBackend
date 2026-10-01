@@ -822,6 +822,10 @@ export const updateUserRelation = asyncHandler(async (req, res) => {
     updatedUserId,
   } = req.body;
 
+  // console.log("flag in controller.....................",flag);
+  // console.log("userId in controller.....................",userId);
+  // console.log("updatedUserId in controller.....................",updatedUserId);
+
   if (flag === undefined || flag === null) {
     return res.status(400).json({
       success: false,
