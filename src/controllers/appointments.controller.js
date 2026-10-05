@@ -28,12 +28,22 @@ export const createAppointment = asyncHandler(async (req, res) => {
 // });
 
 export const getAppointments = asyncHandler(async (req, res) => {
-  const { search = "", sortBy = "", sortOrder = "asc" } = req.query;
+  const {
+    search = "",
+    sortBy = "",
+    sortOrder = "asc",
+    status,
+    medium,
+    teacherId,
+  } = req.query;
 
   const appointments = await appointmentsService.getAppointments({
     search,
     sortBy,
     sortOrder,
+    status,
+    medium,
+    teacherId,
   });
 
   res.status(200).json({

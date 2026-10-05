@@ -127,144 +127,229 @@ export const createAppointment = async (data) => {
   return appointment;
 };
 
-export const getAppointments = async () => {
-  const appointments = await Appointment.find().sort({ createdAt: -1 }).lean();
+// export const getAppointments = async () => {
+//   const appointments = await Appointment.find().sort({ createdAt: -1 }).lean();
 
-  // const enrichedAppointments = await Promise.all(
-  //   appointments.map(async (appointment) => {
-  //     const [teacher, parent] = await Promise.all([
-  //       Teacher.findOne({ userId: appointment.teacherId }).lean(),
-  //       Parent.findOne({ userId: appointment.parentId }).lean(),
-  //     ]);
+//     const enrichedAppointments = await Promise.all(
+//       appointments.map(async (appointment) => {
 
-  //     let teacherUser = null;
-  //     let parentUser = null;
-  //     let organization = null;
-  //     let zonalAdmin = null;
-  //     let admin = null;
+//         // 1. Get teacher first
+//         const teacher = await Teacher.findOne({
+//           teacherId: appointment.teacherId,
+//         }).lean();
 
-  //     if (teacher) {
-  //       teacherUser = await User.findOne({
-  //         userId: teacher.userId,
-  //       })
-  //         .select("-password")
-  //         .lean();
-  //     }
+//         // 2. Now get all other related data
+//         const [
+//           teacherUser,
+//           parent,
+//           parentUser,
+//           organization,
+//           zonalAdmin,
+//           admin,
+//           availability,
+//         ] = await Promise.all([
+//           User.findOne({
+//             userId: appointment.teacherId,
+//           }).lean(),
 
-  //     if (parent) {
-  //       [
-  //         parentUser,
-  //         organization,
-  //         zonalAdmin,
-  //         admin,
-  //       ] = await Promise.all([
-  //         User.findOne({ userId: parent.userId })
-  //           .select("-password")
-  //           .lean(),
+//           Parent.findOne({
+//             parentId: appointment.parentId,
+//           }).lean(),
 
-  //         User.findOne({ userId: parent.organizationId })
-  //           .select("-password")
-  //           .lean(),
+//           User.findOne({
+//             userId: appointment.parentId,
+//           }).lean(),
 
-  //         User.findOne({ userId: parent.zonalAdminId })
-  //           .select("-password")
-  //           .lean(),
+//           teacher?.organizationId
+//             ? User.findOne({
+//                 userId: teacher.organizationId,
+//               }).lean()
+//             : null,
 
-  //         User.findOne({ userId: parent.adminId })
-  //           .select("-password")
-  //           .lean(),
-  //       ]);
-  //     }
+//           teacher?.zonalAdminId
+//             ? User.findOne({
+//                 userId: teacher.zonalAdminId,
+//               }).lean()
+//             : null,
 
-  //     return {
-  //       ...appointment,
+//           teacher?.adminId
+//             ? User.findOne({
+//                 userId: teacher.adminId,
+//               }).lean()
+//             : null,
 
-  //       teacher,
-  //       teacherUser,
+//           // Get Availability using Appointment availabilityId
+//           appointment.availabilityId
+//             ? Availability.findById(appointment.availabilityId).lean()
+//             : null,
+//         ]);
 
-  //       parent,
-  //       parentUser,
+//         return {
+//           ...appointment,
 
-  //       organization,
-  //       zonalAdmin,
-  //       admin,
-  //     };
-  //   })
-  // );
+//           teacher,
+//           teacherUser,
+//           parent,
+//           parentUser,
+//           organization,
+//           zonalAdmin,
+//           admin,
 
+//           // NEW
+//           availability,
+//         };
+//       })
+//     );
+//   return enrichedAppointments;
+// };
 
-    const enrichedAppointments = await Promise.all(
-      appointments.map(async (appointment) => {
+export const getAppointments = async ({
+  search = "",
+  sortBy = "",
+  sortOrder = "asc",
+  status = "",
+  medium = "",
+  teacherId = null,
+} = {}) => {
+  // 1. Build base query for Appointment collection
+  const query = {};
+  if (teacherId) {
+    query.teacherId = Number(teacherId);
+  }
+  if (status) {
+    query.status = new RegExp(`^${status}$`, "i");
+  }
 
-        // 1. Get teacher first
-        const teacher = await Teacher.findOne({
-          teacherId: appointment.teacherId,
-        }).lean();
+  // 2. Fetch base appointments
+  const appointments = await Appointment.find(query).sort({ createdAt: -1 }).lean();
 
-        // 2. Now get all other related data
-        const [
-          teacherUser,
-          parent,
-          parentUser,
-          organization,
-          zonalAdmin,
-          admin,
-          availability,
-        ] = await Promise.all([
-          User.findOne({
-            userId: appointment.teacherId,
-          }).lean(),
+  // 3. Enrich appointments with Teacher, Parent, Users, and Availability
+  let enrichedAppointments = await Promise.all(
+    appointments.map(async (appointment) => {
+      // Get teacher first
+      const teacher = await Teacher.findOne({
+        teacherId: appointment.teacherId,
+      }).lean();
 
-          Parent.findOne({
-            parentId: appointment.parentId,
-          }).lean(),
+      // Get related details in parallel
+      const [
+        teacherUser,
+        parent,
+        parentUser,
+        organization,
+        zonalAdmin,
+        admin,
+        availability,
+      ] = await Promise.all([
+        User.findOne({ userId: appointment.teacherId }).select("-password").lean(),
+        Parent.findOne({ parentId: appointment.parentId }).lean(),
+        User.findOne({ userId: appointment.parentId }).select("-password").lean(),
+        teacher?.organizationId
+          ? User.findOne({ userId: teacher.organizationId }).select("-password").lean()
+          : null,
+        teacher?.zonalAdminId
+          ? User.findOne({ userId: teacher.zonalAdminId }).select("-password").lean()
+          : null,
+        teacher?.adminId
+          ? User.findOne({ userId: teacher.adminId }).select("-password").lean()
+          : null,
+        appointment.availabilityId
+          ? Availability.findById(appointment.availabilityId).lean()
+          : null,
+      ]);
 
-          User.findOne({
-            userId: appointment.parentId,
-          }).lean(),
+      return {
+        ...appointment,
+        teacher,
+        teacherUser,
+        parent,
+        parentUser,
+        organization,
+        zonalAdmin,
+        admin,
+        availability,
+      };
+    })
+  );
 
-          teacher?.organizationId
-            ? User.findOne({
-                userId: teacher.organizationId,
-              }).lean()
-            : null,
+  // 4. Medium filtering (online, home, center/clinic) if requested
+  if (medium) {
+    const med = medium.toLowerCase().trim();
+    enrichedAppointments = enrichedAppointments.filter((item) => {
+      const itemMed = (item.availability?.medium || (item.zoomLink ? "online" : "")).toLowerCase().trim();
+      if (med === "clinic" || med === "center") {
+        return itemMed === "center" || itemMed === "clinic";
+      }
+      return itemMed === med;
+    });
+  }
 
-          teacher?.zonalAdminId
-            ? User.findOne({
-                userId: teacher.zonalAdminId,
-              }).lean()
-            : null,
+  // 5. Search filtering across all key fields
+  if (search && search.trim()) {
+    const q = search.trim().toLowerCase();
+    enrichedAppointments = enrichedAppointments.filter((item) => {
+      const parentName = item.parentUser?.name || "";
+      const teacherName = item.teacherUser?.name || "";
+      const orgName = item.organization?.name || "";
+      const zonalName = item.zonalAdmin?.name || "";
+      const adminName = item.admin?.name || "";
+      const date = item.date || "";
+      const time = item.time || "";
+      const statusStr = item.status || "";
+      const mediumStr = item.availability?.medium || "";
 
-          teacher?.adminId
-            ? User.findOne({
-                userId: teacher.adminId,
-              }).lean()
-            : null,
+      return (
+        parentName.toLowerCase().includes(q) ||
+        teacherName.toLowerCase().includes(q) ||
+        orgName.toLowerCase().includes(q) ||
+        zonalName.toLowerCase().includes(q) ||
+        adminName.toLowerCase().includes(q) ||
+        date.toLowerCase().includes(q) ||
+        time.toLowerCase().includes(q) ||
+        statusStr.toLowerCase().includes(q) ||
+        mediumStr.toLowerCase().includes(q)
+      );
+    });
+  }
 
-          // Get Availability using Appointment availabilityId
-          appointment.availabilityId
-            ? Availability.findById(appointment.availabilityId).lean()
-            : null,
-        ]);
+  // 6. Sorting
+  if (sortBy) {
+    enrichedAppointments.sort((a, b) => {
+      let va = "";
+      let vb = "";
 
-        return {
-          ...appointment,
+      if (sortBy === "parent" || sortBy === "parentUser") {
+        va = a.parentUser?.name || "";
+        vb = b.parentUser?.name || "";
+      } else if (sortBy === "teacher" || sortBy === "teacherUser") {
+        va = a.teacherUser?.name || "";
+        vb = b.teacherUser?.name || "";
+      } else if (sortBy === "organization") {
+        va = a.organization?.name || "";
+        vb = b.organization?.name || "";
+      } else if (sortBy === "zonalAdmin") {
+        va = a.zonalAdmin?.name || "";
+        vb = b.zonalAdmin?.name || "";
+      } else if (sortBy === "admin") {
+        va = a.admin?.name || "";
+        vb = b.admin?.name || "";
+      } else {
+        va = a[sortBy] ?? "";
+        vb = b[sortBy] ?? "";
+      }
 
-          teacher,
-          teacherUser,
-          parent,
-          parentUser,
-          organization,
-          zonalAdmin,
-          admin,
+      const comparison = String(va).localeCompare(String(vb), undefined, {
+        numeric: true,
+        sensitivity: "base",
+      });
 
-          // NEW
-          availability,
-        };
-      })
-    );
+      return sortOrder === "desc" ? -comparison : comparison;
+    });
+  }
+
   return enrichedAppointments;
 };
+
 
 
 // export const getAppointments = async ({
