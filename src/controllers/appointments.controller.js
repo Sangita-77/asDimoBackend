@@ -63,7 +63,8 @@ export const getAppointmentById = asyncHandler(async (req, res) => {
 });
 
 export const confirmAppointment = asyncHandler(async (req, res) => {
-  const appointment = await appointmentsService.confirmAppointment(req.params.id);
+  const { doneBy } = req.body;
+  const appointment = await appointmentsService.confirmAppointment(req.params.id,doneBy);
   res.status(200).json({
     success: true,
     message: "Appointment confirmed successfully",
@@ -72,7 +73,7 @@ export const confirmAppointment = asyncHandler(async (req, res) => {
 });
 
 export const rescheduleAppointment = asyncHandler(async (req, res) => {
-  const {date , time , reason } = req.body;
+  const {date , time , reason , doneBy } = req.body;
 
   if (!date || !time || !reason) {
     return res.status(400).json({
@@ -89,7 +90,7 @@ export const rescheduleAppointment = asyncHandler(async (req, res) => {
 });
 
 export const cancelAppointment = asyncHandler(async (req, res) => {
-  const {reason } = req.body;
+  const {reason , doneBy } = req.body;
 
     if (!reason) {
     return res.status(400).json({
@@ -107,7 +108,8 @@ export const cancelAppointment = asyncHandler(async (req, res) => {
 });
 
 export const completeAppointment = asyncHandler(async (req, res) => {
-  const appointment = await appointmentsService.completeAppointment(req.params.id);
+  const { doneBy } = req.body;
+  const appointment = await appointmentsService.completeAppointment(req.params.id, doneBy);
   res.status(200).json({
     success: true,
     message: "Appointment completed successfully",

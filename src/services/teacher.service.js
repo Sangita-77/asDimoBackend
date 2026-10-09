@@ -276,7 +276,7 @@ export const getAvailabilityWTSer = async () => {
   return data;
 };
 
-export const approveAppointmentSer = async (appointmentId, status) => {
+export const approveAppointmentSer = async (appointmentId, status ,doneBy) => {
 
   const allowedStatus = ["approved", "rejected"];
 
@@ -308,6 +308,7 @@ export const approveAppointmentSer = async (appointmentId, status) => {
     }
 
     appointment.status = "approved";
+    appointment.doneBy = doneBy;
     await appointment.save();
 
     const availability = await Availability.findOne({
@@ -327,6 +328,7 @@ export const approveAppointmentSer = async (appointmentId, status) => {
         date: appointment.date,
         time: appointment.time,
         status: "pending",
+        doneBy: { $ne: doneBy },
         _id: { $ne: appointmentId },
       },
       { status: "rejected" }
@@ -335,6 +337,7 @@ export const approveAppointmentSer = async (appointmentId, status) => {
 
   if (status === "rejected") {
     appointment.status = "rejected";
+    appointment.doneBy = doneBy;
     await appointment.save();
   }
 

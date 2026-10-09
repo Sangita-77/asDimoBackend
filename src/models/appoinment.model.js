@@ -50,6 +50,11 @@ const appoinmentSchema = new mongoose.Schema(
       },
   
       zoomLink: String,
+      doneBy: {
+        type: String,
+        enum: ["parent", "teacher" , "admin" , "superadmin" , "zonaladmin" , "organizationadmin"],
+        default: "parent",
+      },
     },
     { timestamps: true }
   );

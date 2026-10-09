@@ -623,7 +623,7 @@ export const getAppointments = async ({
 //   };
 // };
 
-export const confirmAppointment = async (id) => {
+export const confirmAppointment = async (id, doneBy) => {
   const appointment = await Appointment.findById(id);
   if (!appointment) {
     const error = new Error("Appointment not found");
@@ -631,6 +631,7 @@ export const confirmAppointment = async (id) => {
     throw error;
   }
   appointment.status = "approved";
+  appointment.doneBy = doneBy;
   await appointment.save();
   return appointment;
 };
@@ -703,6 +704,7 @@ export const rescheduleAppointment = async (id, data) => {
   appointment.zoomLink = availability.zoomLink;
   appointment.status = "rescheduled";
   appointment.reason = data.reason || appointment.reason;
+  appointment.doneBy = doneBy;
 
   await appointment.save();
 
@@ -801,6 +803,7 @@ export const cancelAppointment = async (id , data) => {
   }
   appointment.status = "cancelled";
   appointment.reason = data.reason || appointment.reason;
+  appointment.doneBy = data.doneBy || appointment.doneBy;
   await appointment.save();
   await Availability.findOneAndUpdate(
     { userId: appointment.teacherId, date: appointment.date, time: appointment.time },
@@ -892,7 +895,7 @@ export const cancelAppointment = async (id , data) => {
   return appointment;
 };
 
-export const completeAppointment = async (id) => {
+export const completeAppointment = async (id, doneBy) => {
   const appointment = await Appointment.findById(id);
   if (!appointment) {
     const error = new Error("Appointment not found");
@@ -900,6 +903,7 @@ export const completeAppointment = async (id) => {
     throw error;
   }
   appointment.status = "completed";
+  appointment.doneBy = doneBy;
   await appointment.save();
 
   // Fetch Parent & Teacher Details

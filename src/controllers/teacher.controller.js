@@ -47,7 +47,7 @@ export const getAvailabilityWTCon = asyncHandler(async (req,res) => {
 
 
 export const approveAppointmentCon = asyncHandler(async (req, res) => {
-  const { appointmentId, status } = req.body;
+  const { appointmentId, status , doneBy } = req.body;
 
   if (!appointmentId || !status) {
     return res.status(400).json({
@@ -56,7 +56,7 @@ export const approveAppointmentCon = asyncHandler(async (req, res) => {
     });
   }
 
-  const data = await approveAppointmentSer(appointmentId, status);
+  const data = await approveAppointmentSer(appointmentId, status ,  doneBy);
 
   res.status(200).json({
     success: true,
