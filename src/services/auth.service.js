@@ -437,6 +437,9 @@ export const registerUser = async (userData) => {
                 yearsOfExperience: userData.yearsOfExperience,
                 languages: userData.languages,
                 cliniqueName: userData.cliniqueName,
+                gender: userData.gender,
+                fees: userData.fees,
+                about_doctor: userData.about_doctor,
               },
             ],
             { session }
@@ -481,6 +484,9 @@ export const registerUser = async (userData) => {
                 yearsOfExperience: userData.yearsOfExperience,
                 languages: userData.languages,
                 cliniqueName: userData.cliniqueName,
+                gender: userData.gender,
+                fees: userData.fees,
+                about_doctor: userData.about_doctor,
               },
             ],
             { session }
@@ -611,6 +617,9 @@ export const registerUser = async (userData) => {
               yearsOfExperience: userData.yearsOfExperience,
               languages: userData.languages,
               cliniqueName: userData.cliniqueName,
+              gender: userData.gender,
+              fees: userData.fees,
+              about_doctor: userData.about_doctor,
             });
           } else if (flag === 5) {
             const organizationAdmin = await OrganizationAdmin.create({
@@ -642,6 +651,9 @@ export const registerUser = async (userData) => {
                 yearsOfExperience: userData.yearsOfExperience,
                 languages: userData.languages,
                 cliniqueName: userData.cliniqueName,
+                gender: userData.gender,
+                fees: userData.fees,
+                about_doctor: userData.about_doctor,
               }
             );
         } else if (flag === 6) {
@@ -1228,15 +1240,93 @@ const uniqueNumbers = (values) => [
 const getRelatedCount = (item, key) =>
   item.relatedData?.[key]?.count ?? item.relatedData?.[key]?.data?.length ?? 0;
 
-const normalizeSortOptions = ({ sort, sortBy, sortOrder } = {}) => {
+// const normalizeSortOptions = ({ sort, sortBy, sortOrder } = {}) => {
+//   const sortText = String(sort ?? "").toLowerCase().trim();
+//   const fieldText = String(sortBy ?? "").toLowerCase().trim();
+//   const orderText = String(sortOrder ?? "").toLowerCase().trim();
+//   const joinedSortText = [sortText, fieldText, orderText].filter(Boolean).join(" ");
+//   const compactFieldText = fieldText.replace(/[^a-z0-9]/g, "");
+//   const compactSortText = sortText.replace(/[^a-z0-9]/g, "");
+
+//   let field = "name";
+//   if (["admin", "admins", "admincount", "adminscount"].includes(compactFieldText)) {
+//     field = "admin";
+//   } else if (
+//     [
+//       "organization",
+//       "organizations",
+//       "organisation",
+//       "organisations",
+//       "org",
+//       "orgs",
+//       "organizationcount",
+//       "organizationscount",
+//       "organisationcount",
+//       "organisationscount",
+//       "orgcount",
+//       "orgscount",
+//     ].includes(compactFieldText)
+//   ) {
+//     field = "organizations";
+//   } else if (["name", "username"].includes(fieldText)) {
+//     field = "name";
+//   } else if (
+//     compactSortText.includes("organization") ||
+//     compactSortText.includes("organisation") ||
+//     compactSortText.includes("orgcount")
+//   ) {
+//     field = "organizations";
+//   } else if (compactSortText.includes("admin")) {
+//     field = "admin";
+//   } else if (compactSortText.includes("name")) {
+//     field = "name";
+//   }
+
+//   let direction = orderText || sortText;
+//   if (
+//     joinedSortText.includes("z-a") ||
+//     joinedSortText.includes("za") ||
+//     joinedSortText.includes("desc") ||
+//     joinedSortText.includes("max-min") ||
+//     joinedSortText.includes("max to min")
+//   ) {
+//     direction = "desc";
+//   } else if (
+//     joinedSortText.includes("a-z") ||
+//     joinedSortText.includes("az") ||
+//     joinedSortText.includes("asc") ||
+//     joinedSortText.includes("min-max") ||
+//     joinedSortText.includes("min to max")
+//   ) {
+//     direction = "asc";
+//   }
+
+//   return {
+//     field,
+//     direction: direction === "desc" ? "desc" : "asc",
+//   };
+// };
+
+
+const normalizeSortOptions = ({
+  sort,
+  sortBy,
+  sortOrder,
+} = {}) => {
   const sortText = String(sort ?? "").toLowerCase().trim();
   const fieldText = String(sortBy ?? "").toLowerCase().trim();
   const orderText = String(sortOrder ?? "").toLowerCase().trim();
-  const joinedSortText = [sortText, fieldText, orderText].filter(Boolean).join(" ");
+
+  const joinedSortText = [sortText, fieldText, orderText]
+    .filter(Boolean)
+    .join(" ");
+
   const compactFieldText = fieldText.replace(/[^a-z0-9]/g, "");
   const compactSortText = sortText.replace(/[^a-z0-9]/g, "");
 
-  let field = "name";
+  // Default sorting
+  let field = "createdAt";
+
   if (["admin", "admins", "admincount", "adminscount"].includes(compactFieldText)) {
     field = "admin";
   } else if (
@@ -1256,7 +1346,13 @@ const normalizeSortOptions = ({ sort, sortBy, sortOrder } = {}) => {
     ].includes(compactFieldText)
   ) {
     field = "organizations";
-  } else if (["name", "username"].includes(fieldText)) {
+  } else if (
+    ["createdat", "date", "registrationdate", "registereddate"].includes(
+      compactFieldText
+    )
+  ) {
+    field = "createdAt";
+  } else if (["name", "username"].includes(compactFieldText)) {
     field = "name";
   } else if (
     compactSortText.includes("organization") ||
@@ -1266,11 +1362,14 @@ const normalizeSortOptions = ({ sort, sortBy, sortOrder } = {}) => {
     field = "organizations";
   } else if (compactSortText.includes("admin")) {
     field = "admin";
+  } else if (compactSortText.includes("createdat") || compactSortText.includes("date")) {
+    field = "createdAt";
   } else if (compactSortText.includes("name")) {
     field = "name";
   }
 
   let direction = orderText || sortText;
+
   if (
     joinedSortText.includes("z-a") ||
     joinedSortText.includes("za") ||
@@ -1291,9 +1390,21 @@ const normalizeSortOptions = ({ sort, sortBy, sortOrder } = {}) => {
 
   return {
     field,
-    direction: direction === "desc" ? "desc" : "asc",
+    direction: direction === "asc" ? "asc" : "desc",
   };
 };
+
+// const getSortableValue = (item, field) => {
+//   if (field === "admin") {
+//     return getRelatedCount(item, "admins");
+//   }
+
+//   if (field === "organizations") {
+//     return getRelatedCount(item, "organizations");
+//   }
+
+//   return String(item.name ?? "").toLowerCase();
+// };
 
 const getSortableValue = (item, field) => {
   if (field === "admin") {
@@ -1304,7 +1415,15 @@ const getSortableValue = (item, field) => {
     return getRelatedCount(item, "organizations");
   }
 
-  return String(item.name ?? "").toLowerCase();
+  if (field === "createdAt") {
+    return item.createdAt ? new Date(item.createdAt).getTime() : null;
+  }
+
+  if (field === "name") {
+    return String(item.name ?? "").toLowerCase();
+  }
+
+  return null;
 };
 
 const searchableText = (item) =>
@@ -2612,7 +2731,9 @@ export const updateProfileById = async (
 
 
 export const getAllUsersService = async (flag, options = {}) => {
-  const users = await User.find({ flag }).select("-password").lean();
+  const users = await User.find({ flag })
+    .select("-password")
+    .lean();
 
   if (!users || users.length === 0) {
     const error = new Error("No users found");
@@ -2626,47 +2747,29 @@ export const getAllUsersService = async (flag, options = {}) => {
 
       switch (user.flag) {
         case 0:
-          roleData =
-            await SuperAdmin.findOne({
-              userId: user.userId,
-            }).lean();
+          roleData = await SuperAdmin.findOne({ userId: user.userId }).lean();
           break;
 
         case 1:
-          roleData =
-            await OrganizationAdmin.findOne({
-              userId: user.userId,
-            }).lean();
+          roleData = await OrganizationAdmin.findOne({ userId: user.userId }).lean();
           break;
 
         case 2:
         case 4:
-          roleData =
-            await Parent.findOne({
-              userId: user.userId,
-            }).lean();
+          roleData = await Parent.findOne({ userId: user.userId }).lean();
           break;
 
         case 3:
         case 5:
-          roleData =
-            await Teacher.findOne({
-              userId: user.userId,
-            }).lean();
+          roleData = await Teacher.findOne({ userId: user.userId }).lean();
           break;
 
         case 6:
-          roleData =
-            await ZonalAdmin.findOne({
-              userId: user.userId,
-            }).lean();
+          roleData = await ZonalAdmin.findOne({ userId: user.userId }).lean();
           break;
 
         case 7:
-          roleData =
-            await Admin.findOne({
-              userId: user.userId,
-            }).lean();
+          roleData = await Admin.findOne({ userId: user.userId }).lean();
           break;
 
         default:
@@ -2676,51 +2779,35 @@ export const getAllUsersService = async (flag, options = {}) => {
       const relatedData = await getRelatedRoleData(user, roleData);
 
       if (relatedData?.zonalAdmins?.data) {
-        relatedData.zonalAdmins.data = await enrichWithUserData(
-          relatedData.zonalAdmins.data
-        );
+        relatedData.zonalAdmins.data = await enrichWithUserData(relatedData.zonalAdmins.data);
       }
 
       if (relatedData?.admins?.data) {
-        relatedData.admins.data = await enrichWithUserData(
-          relatedData.admins.data
-        );
+        relatedData.admins.data = await enrichWithUserData(relatedData.admins.data);
       }
 
       if (relatedData?.organizations?.data) {
-        relatedData.organizations.data = await enrichWithUserData(
-          relatedData.organizations.data
-        );
+        relatedData.organizations.data = await enrichWithUserData(relatedData.organizations.data);
       }
 
       if (relatedData?.teachers?.data) {
-        relatedData.teachers.data = await enrichWithUserData(
-          relatedData.teachers.data
-        );
+        relatedData.teachers.data = await enrichWithUserData(relatedData.teachers.data);
       }
 
       if (relatedData?.parents?.data) {
-        relatedData.parents.data = await enrichWithUserData(
-          relatedData.parents.data
-        );
+        relatedData.parents.data = await enrichWithUserData(relatedData.parents.data);
       }
 
       if (relatedData?.zonalAdmin && !relatedData.zonalAdmin.userData) {
-        relatedData.zonalAdmin = await enrichSingleWithUserData(
-          relatedData.zonalAdmin
-        );
+        relatedData.zonalAdmin = await enrichSingleWithUserData(relatedData.zonalAdmin);
       }
 
       if (relatedData?.Admin && !relatedData.Admin.userData) {
-        relatedData.Admin = await enrichSingleWithUserData(
-          relatedData.Admin
-        );
+        relatedData.Admin = await enrichSingleWithUserData(relatedData.Admin);
       }
 
       if (relatedData?.admin && !relatedData.admin.userData) {
-        relatedData.admin = await enrichSingleWithUserData(
-          relatedData.admin
-        );
+        relatedData.admin = await enrichSingleWithUserData(relatedData.admin);
       }
 
       if (
@@ -2734,15 +2821,11 @@ export const getAllUsersService = async (flag, options = {}) => {
       }
 
       if (relatedData?.organization && !relatedData.organization.userData) {
-        relatedData.organization = await enrichSingleWithUserData(
-          relatedData.organization
-        );
+        relatedData.organization = await enrichSingleWithUserData(relatedData.organization);
       }
 
       if (relatedData?.teacher && !relatedData.teacher.userData) {
-        relatedData.teacher = await enrichSingleWithUserData(
-          relatedData.teacher
-        );
+        relatedData.teacher = await enrichSingleWithUserData(relatedData.teacher);
       }
 
       return {
@@ -2753,8 +2836,169 @@ export const getAllUsersService = async (flag, options = {}) => {
     })
   );
 
+  // Check whether the frontend has explicitly requested sorting.
+  const hasUserSelectedSort =
+    options?.sortBy &&
+    options.sortBy !== "name" &&
+    options?.sortOrder;
+
+  // Default: latest registrations first.
+  if (!hasUserSelectedSort) {
+    return applySearchAndSort(enrichedUsers, {
+      ...options,
+      sortBy: "createdAt",
+      sortOrder: "desc",
+    });
+  }
+
+  // User-selected sorting.
   return applySearchAndSort(enrichedUsers, options);
 };
+
+// export const getAllUsersService = async (flag, options = {}) => {
+//   const users = await User.find({ flag }).select("-password").lean();
+
+//   if (!users || users.length === 0) {
+//     const error = new Error("No users found");
+//     error.statusCode = 404;
+//     throw error;
+//   }
+
+//   const enrichedUsers = await Promise.all(
+//     users.map(async (user) => {
+//       let roleData = null;
+
+//       switch (user.flag) {
+//         case 0:
+//           roleData =
+//             await SuperAdmin.findOne({
+//               userId: user.userId,
+//             }).lean();
+//           break;
+
+//         case 1:
+//           roleData =
+//             await OrganizationAdmin.findOne({
+//               userId: user.userId,
+//             }).lean();
+//           break;
+
+//         case 2:
+//         case 4:
+//           roleData =
+//             await Parent.findOne({
+//               userId: user.userId,
+//             }).lean();
+//           break;
+
+//         case 3:
+//         case 5:
+//           roleData =
+//             await Teacher.findOne({
+//               userId: user.userId,
+//             }).lean();
+//           break;
+
+//         case 6:
+//           roleData =
+//             await ZonalAdmin.findOne({
+//               userId: user.userId,
+//             }).lean();
+//           break;
+
+//         case 7:
+//           roleData =
+//             await Admin.findOne({
+//               userId: user.userId,
+//             }).lean();
+//           break;
+
+//         default:
+//           roleData = null;
+//       }
+
+//       const relatedData = await getRelatedRoleData(user, roleData);
+
+//       if (relatedData?.zonalAdmins?.data) {
+//         relatedData.zonalAdmins.data = await enrichWithUserData(
+//           relatedData.zonalAdmins.data
+//         );
+//       }
+
+//       if (relatedData?.admins?.data) {
+//         relatedData.admins.data = await enrichWithUserData(
+//           relatedData.admins.data
+//         );
+//       }
+
+//       if (relatedData?.organizations?.data) {
+//         relatedData.organizations.data = await enrichWithUserData(
+//           relatedData.organizations.data
+//         );
+//       }
+
+//       if (relatedData?.teachers?.data) {
+//         relatedData.teachers.data = await enrichWithUserData(
+//           relatedData.teachers.data
+//         );
+//       }
+
+//       if (relatedData?.parents?.data) {
+//         relatedData.parents.data = await enrichWithUserData(
+//           relatedData.parents.data
+//         );
+//       }
+
+//       if (relatedData?.zonalAdmin && !relatedData.zonalAdmin.userData) {
+//         relatedData.zonalAdmin = await enrichSingleWithUserData(
+//           relatedData.zonalAdmin
+//         );
+//       }
+
+//       if (relatedData?.Admin && !relatedData.Admin.userData) {
+//         relatedData.Admin = await enrichSingleWithUserData(
+//           relatedData.Admin
+//         );
+//       }
+
+//       if (relatedData?.admin && !relatedData.admin.userData) {
+//         relatedData.admin = await enrichSingleWithUserData(
+//           relatedData.admin
+//         );
+//       }
+
+//       if (
+//         relatedData?.organizations &&
+//         !relatedData.organizations.data &&
+//         !relatedData.organizations.userData
+//       ) {
+//         relatedData.organizations = await enrichSingleWithUserData(
+//           relatedData.organizations
+//         );
+//       }
+
+//       if (relatedData?.organization && !relatedData.organization.userData) {
+//         relatedData.organization = await enrichSingleWithUserData(
+//           relatedData.organization
+//         );
+//       }
+
+//       if (relatedData?.teacher && !relatedData.teacher.userData) {
+//         relatedData.teacher = await enrichSingleWithUserData(
+//           relatedData.teacher
+//         );
+//       }
+
+//       return {
+//         ...user,
+//         roleData,
+//         relatedData,
+//       };
+//     })
+//   );
+
+//   return applySearchAndSort(enrichedUsers, options);
+// };
 
 export const getRelatedRoleDataRelation = async (
   user,

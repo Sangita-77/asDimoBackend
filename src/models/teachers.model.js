@@ -52,6 +52,7 @@ const teacherSchema = new mongoose.Schema(
         "speech therapist",
         "special educator",
         "operational therapist",
+        "special package",
       ],
       required: true,
     },
@@ -76,6 +77,22 @@ const teacherSchema = new mongoose.Schema(
       min: 0,
     },
     licenseNumber: {
+      type: String,
+      default: null,
+      trim: true,
+    },
+    gender: {
+      type: String,
+      enum: ["Male", "Female", "Other"],
+      default: null,
+    },
+    fees: {
+      type: Number,
+      default: 0,
+      min: 0,
+    },
+
+    about_doctor: {
       type: String,
       default: null,
       trim: true,

@@ -57,6 +57,9 @@ export const register = asyncHandler(async (req, res) => {
     yearsOfExperience,
     languages,
     cliniqueName,
+    gender,
+    fees,
+    about_doctor,
   } = req.body;
 
   // console.log("BODY =>", req.body);
@@ -76,10 +79,12 @@ export const register = asyncHandler(async (req, res) => {
   const numericFlag = Number(flag);
 
   const therapistCategories = [
+    
     "Psychologist",
     "speech therapist",
     "special educator",
     "operational therapist",
+    "special package",
   ];
 
   if (
@@ -89,7 +94,7 @@ export const register = asyncHandler(async (req, res) => {
     return res.status(400).json({
       success: false,
       message:
-        "therapist_category is required for Therapist and Global Therapist and must be Psychologist, speech therapist, special educator, or operational therapist",
+        "therapist_category is required for Therapist and Global Therapist and must be Psychologist, special package, speech therapist, special educator, or operational therapist",
     });
   }
 
@@ -218,6 +223,10 @@ export const register = asyncHandler(async (req, res) => {
     yearsOfExperience,
     languages,
     cliniqueName,
+
+    gender,
+    fees,
+    about_doctor,
   });
 
   res.status(201).json({
