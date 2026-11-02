@@ -32,6 +32,214 @@ import { asyncHandler } from "../utils/asyncHandler.js";
 import OrganizationAdmin from "../models/organizationAdmin.model.js";
 
 
+// export const register = asyncHandler(async (req, res) => {
+//   const {
+//     name,
+//     email,
+//     flag,
+//     referralCode,
+//     organizationId,
+//     organization_type,
+//     superAdminId,
+//     zonalAdminId,
+//     adminId,
+//     organizationAdminId,
+//     therapistId,
+//     teacherId,
+//     city,
+//     state,
+//     pincode,
+//     address,
+//     phone,
+//     country,
+//     org_name,
+//     therapist_category,
+//     yearsOfExperience,
+//     languages,
+//     cliniqueName,
+//     gender,
+//     fees,
+//     about_doctor,
+//   } = req.body;
+
+//   // console.log("BODY =>", req.body);
+//   // console.log("FILE =>", req.file);
+
+//   const profileImg = req.file
+//   ? `/uploads/profile/${req.file.filename}`
+//   : null;
+
+//   if (!name || !email || flag === undefined || flag === null) {
+//     return res.status(400).json({
+//       success: false,
+//       message: "Please provide name, email, and flag",
+//     });
+//   }
+
+//   const numericFlag = Number(flag);
+
+//   const therapistCategories = [
+    
+//     "Psychologist",
+//     "speech therapist",
+//     "special educator",
+//     "operational therapist",
+//     "special package",
+//   ];
+
+//   if (
+//     [3, 5].includes(numericFlag) &&
+//     !therapistCategories.includes(therapist_category)
+//   ) {
+//     return res.status(400).json({
+//       success: false,
+//       message:
+//         "therapist_category is required for Therapist and Global Therapist and must be Psychologist, special package, speech therapist, special educator, or operational therapist",
+//     });
+//   }
+
+//   if (numericFlag === 6 && (!superAdminId || !city || !state || !pincode || !address)) {
+//     return res.status(400).json({
+//       success: false,
+//       message: "superAdminId and full address are required for Zonal Admin",
+//     });
+//   }
+
+//   if (numericFlag === 7 && (!zonalAdminId || !city || !state || !pincode || !address)) {
+//     return res.status(400).json({
+//       success: false,
+//       message: "zonalAdminId and full address are required for Admin",
+//     });
+//   }
+
+//   if (numericFlag === 1 && (!adminId || !city || !state || !pincode || !address)) {
+//     return res.status(400).json({
+//       success: false,
+//       message: "adminId and full address are required for Organization Admin",
+//     });
+//   }
+
+//   if (numericFlag === 5 && !adminId) {
+//     return res.status(400).json({
+//       success: false,
+//       message: "adminId is required for Global Therapist",
+//     });
+//   }
+
+//   // organization_type mandatory for OrganizationAdmin
+//   if (numericFlag === 1 && organization_type === undefined) {
+//     return res.status(400).json({
+//       success: false,
+//       message: "organization_type is required for Organization Admin",
+//     });
+//   }
+
+//   // Validate organization_type value
+//   if (numericFlag === 1 && ![0, 1].includes(Number(organization_type))) {
+//     return res.status(400).json({
+//       success: false,
+//       message: "organization_type must be 0 (Clinic) or 1 (School)",
+//     });
+//   }
+
+//   if (numericFlag === 3 && !organizationAdminId && !organizationId) {
+//     return res.status(400).json({
+//       success: false,
+//       message: "organizationAdminId is required for Therapist",
+//     });
+//   }
+
+//   if (
+//     numericFlag === 2 &&
+//     !therapistId &&
+//     !teacherId &&
+//     !referralCode
+//   ) {
+//     return res.status(400).json({
+//       success: false,
+//       message: "therapistId or referralCode is required for Parent",
+//     });
+//   }
+
+//   // const { user, generatedPassword, role } = await registerUser({
+//   //   name,
+//   //   email,
+//   //   flag,
+//   //   organizationId,
+//   //   organization_type,
+//   //   address
+//   // });
+
+//   let generatedOrgName = org_name;
+
+//   if (numericFlag === 5) {
+//     // First 3 letters of name
+//     const prefix = name
+//       .trim()
+//       .substring(0, 3)
+//       .toUpperCase();
+
+//     // Find last generated org_name
+//     const lastOrg = await OrganizationAdmin.findOne({
+//       org_name: { $regex: `^${prefix}_` },
+//     }).sort({ org_name: -1 });
+
+//     let nextNumber = 1;
+
+//     if (lastOrg) {
+//       const lastSequence = parseInt(lastOrg.org_name.split("_")[1]) || 0;
+//       nextNumber = lastSequence + 1;
+//     }
+
+//     generatedOrgName = `${prefix}_${String(nextNumber).padStart(3, "0")}`;
+//   }
+
+//   if (numericFlag === 1) {
+//     generatedOrgName = name;
+//   }
+
+//   const { user, generatedPassword, role } = await registerUser({
+//     name,
+//     email,
+//     flag,
+//     referralCode,
+//     organizationId,
+//     organization_type,
+//     address,
+//     phone,
+//     country,
+//     superAdminId,
+//     zonalAdminId,
+//     adminId,
+//     organizationAdminId,
+//     therapistId,
+//     teacherId,
+//     city,
+//     state,
+//     pincode,
+//     profileImg,
+//     org_name: generatedOrgName,
+//     therapist_category,
+//     yearsOfExperience,
+//     languages,
+//     cliniqueName,
+
+//     gender,
+//     fees,
+//     about_doctor,
+//   });
+
+//   res.status(201).json({
+//     success: true,
+//     message: "User registered successfully",
+//     data: {
+//       user,
+//       generatedPassword,
+//       role,
+//     },
+//   });
+// });
+
 export const register = asyncHandler(async (req, res) => {
   const {
     name,
@@ -54,6 +262,8 @@ export const register = asyncHandler(async (req, res) => {
     country,
     org_name,
     therapist_category,
+    specialization,
+    qualifications,
     yearsOfExperience,
     languages,
     cliniqueName,
@@ -62,12 +272,9 @@ export const register = asyncHandler(async (req, res) => {
     about_doctor,
   } = req.body;
 
-  // console.log("BODY =>", req.body);
-  // console.log("FILE =>", req.file);
-
   const profileImg = req.file
-  ? `/uploads/profile/${req.file.filename}`
-  : null;
+    ? `/uploads/profile/${req.file.filename}`
+    : null;
 
   if (!name || !email || flag === undefined || flag === null) {
     return res.status(400).json({
@@ -79,7 +286,6 @@ export const register = asyncHandler(async (req, res) => {
   const numericFlag = Number(flag);
 
   const therapistCategories = [
-    
     "Psychologist",
     "speech therapist",
     "special educator",
@@ -94,7 +300,7 @@ export const register = asyncHandler(async (req, res) => {
     return res.status(400).json({
       success: false,
       message:
-        "therapist_category is required for Therapist and Global Therapist and must be Psychologist, special package, speech therapist, special educator, or operational therapist",
+        "therapist_category is required for Therapist and Global Therapist and must be Psychologist,special package, speech therapist, special educator, or operational therapist",
     });
   }
 
@@ -126,7 +332,6 @@ export const register = asyncHandler(async (req, res) => {
     });
   }
 
-  // organization_type mandatory for OrganizationAdmin
   if (numericFlag === 1 && organization_type === undefined) {
     return res.status(400).json({
       success: false,
@@ -134,7 +339,6 @@ export const register = asyncHandler(async (req, res) => {
     });
   }
 
-  // Validate organization_type value
   if (numericFlag === 1 && ![0, 1].includes(Number(organization_type))) {
     return res.status(400).json({
       success: false,
@@ -161,25 +365,14 @@ export const register = asyncHandler(async (req, res) => {
     });
   }
 
-  // const { user, generatedPassword, role } = await registerUser({
-  //   name,
-  //   email,
-  //   flag,
-  //   organizationId,
-  //   organization_type,
-  //   address
-  // });
-
   let generatedOrgName = org_name;
 
   if (numericFlag === 5) {
-    // First 3 letters of name
     const prefix = name
       .trim()
       .substring(0, 3)
       .toUpperCase();
 
-    // Find last generated org_name
     const lastOrg = await OrganizationAdmin.findOne({
       org_name: { $regex: `^${prefix}_` },
     }).sort({ org_name: -1 });
@@ -220,10 +413,11 @@ export const register = asyncHandler(async (req, res) => {
     profileImg,
     org_name: generatedOrgName,
     therapist_category,
+    specialization,
+    qualifications,
     yearsOfExperience,
     languages,
     cliniqueName,
-
     gender,
     fees,
     about_doctor,
@@ -239,7 +433,6 @@ export const register = asyncHandler(async (req, res) => {
     },
   });
 });
-
 
 export const login = asyncHandler(async (req, res) => {
   const { email, password } = req.body;

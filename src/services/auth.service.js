@@ -217,10 +217,584 @@ const generateReferralCode = (name, length = 6) => {
 //   return code;
 // };
 
+/////////////////////
+// export const registerUser = async (userData) => {
+
+//   // return userData;
+//   // Check if user already exists
+//   const existingUser = await User.findOne({ email: userData.email });
+//   if (existingUser) {
+//     const error = new Error("User with this email already exists");
+//     error.statusCode = 400;
+//     throw error;
+//   }
+
+//   let referralCode;
+//   let exists;
+
+//   do {
+//     // referralCode = generateReferralCode(6);
+//       referralCode = generateReferralCode(userData.name, 6);
+
+//     exists = await User.findOne({
+//       referralCode,
+//     });
+//   } while (exists);
+
+//   try {
+//     const generatedPassword = generateRandomPassword();
+
+//     const flag = Number(userData.flag);
+
+//     // If referralCode provided for Parent (flag === 2), map referring user to required parent fields
+//     if (flag === 2 && userData.referralCode) {
+//       const refUser = await User.findOne({ referralCode: userData.referralCode });
+//       if (!refUser) {
+//         const error = new Error("Invalid referralCode: user not found");
+//         error.statusCode = 404;
+//         throw error;
+//       }
+
+//       const refFlag = Number(refUser.flag);
+
+//       // If referring user is an Organization Admin, attach organizationAdminId and organizationId
+//       if (refFlag === 1) {
+//         userData.organizationAdminId = refUser.userId;
+//         userData.organizationId = refUser.userId;
+//       }
+
+//       // If referring user is a Teacher or special OrganizationAdmin (flag 3 or 5), treat as therapist/teacher
+//       if (refFlag === 3 || refFlag === 5) {
+//         userData.therapistId = refUser.userId;
+//         userData.teacherId = refUser.userId;
+
+//         // Try to resolve organization admin info to derive adminId / zonalAdminId
+//         let orgAdmin = null;
+
+//         if (refFlag === 3) {
+//           const teacherDoc = await Teacher.findOne({ teacherId: refUser.userId });
+//           if (teacherDoc) {
+//             const orgLookup = [];
+//             if (teacherDoc.organizationAdminId !== undefined && teacherDoc.organizationAdminId !== null) {
+//               orgLookup.push({ organizationAdminId: teacherDoc.organizationAdminId });
+//             }
+//             if (teacherDoc.organizationId !== undefined && teacherDoc.organizationId !== null) {
+//               orgLookup.push({ organizationId: teacherDoc.organizationId });
+//             }
+//             if (orgLookup.length) {
+//               orgAdmin = await OrganizationAdmin.findOne({ $or: orgLookup });
+//             }
+//             // If teacherDoc itself has admin/zonal info, prefer that
+//             if (!orgAdmin) {
+//               if (teacherDoc.adminId || teacherDoc.zonalAdminId) {
+//                 orgAdmin = {
+//                   adminId: teacherDoc.adminId ?? null,
+//                   zonalAdminId: teacherDoc.zonalAdminId ?? null,
+//                   organizationAdminId: teacherDoc.organizationAdminId ?? null,
+//                   organizationId: teacherDoc.organizationId ?? null,
+//                 };
+//               }
+//             }
+//           }
+//         } else if (refFlag === 5) {
+//           orgAdmin = await OrganizationAdmin.findOne({
+//             $or: [{ organizationAdminId: refUser.userId }, { organizationId: refUser.userId }],
+//           });
+//         }
+
+//         if (orgAdmin) {
+//           userData.adminId = orgAdmin.adminId ?? userData.adminId;
+//           userData.zonalAdminId = orgAdmin.zonalAdminId ?? userData.zonalAdminId;
+//           userData.organizationAdminId = orgAdmin.organizationAdminId ?? orgAdmin.organizationId ?? userData.organizationAdminId;
+//           userData.organizationId = orgAdmin.organizationId ?? userData.organizationId;
+//         }
+//       }
+//     }
+
+
+//     if (flag === 1) {
+//       requireField(userData.organization_type, "organization_type", "Organization Admin");
+//       if (![0, 1].includes(Number(userData.organization_type))) {
+//         const error = new Error("organization_type must be 0 (Clinic) or 1 (School)");
+//         error.statusCode = 400;
+//         throw error;
+//       }
+//     }
+
+//     const parents = await getRoleParents(flag, userData);
+
+//     // Use transaction when available; fallback to manual rollback if transactions are not supported
+//     const session = await mongoose.startSession();
+//     let user;
+//     let roleDoc;
+
+//     try {
+//       await session.withTransaction(async () => {
+//         user = await User.create(
+//           [
+//             {
+//               name: userData.name,
+//               email: userData.email,
+//               flag,
+//               password: generatedPassword,
+//               referralCode,
+//               status: 1,
+//               city : userData.city,
+//               state : userData.state,
+//               pincode : userData.pincode,
+//               address : userData.address,
+//               phone : userData.phone,
+//               country : userData.country,
+//               profileImg: userData.profileImg,
+//               org_name: userData.org_name,
+//             },
+//           ],
+//           { session }
+//         );
+//         user = user[0];
+//         // user = await User.findById(user._id);
+//         user = await User.findById(user._id).session(session);
+//         // await user.save({ session });
+//         // console.log("Created user:", {
+//         //   _id: user._id,
+//         //   userId: user.userId,
+//         // });
+
+//         // Create role-specific "table"
+//         if (flag === 0) {
+//           roleDoc = await SuperAdmin.create(
+//             [
+//               {
+//                 adminId: user.userId,
+//                 userId: user.userId,
+//                 user: user._id,
+//               },
+//             ],
+//             { session }
+//           );
+//           roleDoc = roleDoc[0];
+//         } else if (flag === 1) {
+//           roleDoc = await OrganizationAdmin.create(
+//             [
+//               {
+//                 organizationAdminId: user.userId,
+//                 userId: user.userId,
+//                 user: user._id,
+//                 // for OrganizationAdmin, organizationId is this same user's userId
+//                 organizationId: user.userId,
+//                 adminId: parents.admin.adminId,
+//                 organization_type: Number(userData.organization_type),
+//                 zonalAdminId: parents.admin.zonalAdminId,
+//                 city : userData.city,
+//                 state : userData.state,
+//                 pincode : userData.pincode,
+//                 address : userData.address,
+//                 country : userData.country,
+//                 phone : userData.phone,
+//               },
+//             ],
+//             { session }
+//           );
+//           roleDoc = roleDoc[0];
+//         } else if (flag === 2 || flag === 4) {
+//           roleDoc = await Parent.create(
+//             [
+//               {
+//                 parentId: user.userId,
+//                 userId: user.userId,
+//                 user: user._id,
+//                 organizationId: flag === 2 ? parents.therapist.organizationId : null,
+//                 organizationAdminId:
+//                   flag === 2 ? parents.therapist.organizationAdminId : null,
+//                 zonalAdminId:
+//                   flag === 2
+//                     ? parents.therapist.zonalAdminId ??
+//                       parents.organizationAdmin?.zonalAdminId
+//                     : null,
+//                 adminId:
+//                   flag === 2
+//                     ? parents.therapist.adminId ?? parents.organizationAdmin?.adminId
+//                     : null,
+//                 therapistId: flag === 2 ? parents.therapist.teacherId : null,
+//                 teacherId: flag === 2 ? parents.therapist.teacherId : null,
+//               },
+//             ],
+//             { session }
+//           );
+//           roleDoc = roleDoc[0];
+//         } else if (flag === 3) {
+//           roleDoc = await Teacher.create(
+//             [
+//               {
+//                 teacherId: user.userId,
+//                 userId: user.userId,
+//                 user: user._id,
+//                 organizationId: parents.organizationAdmin.organizationId,
+//                 organizationAdminId: parents.organizationAdmin.organizationAdminId,
+//                 zonalAdminId: parents.organizationAdmin.zonalAdminId,
+//                 adminId: parents.organizationAdmin.adminId,
+//                 therapist_category: userData.therapist_category,
+//                 yearsOfExperience: userData.yearsOfExperience,
+//                 languages: userData.languages,
+//                 cliniqueName: userData.cliniqueName,
+//                 gender: userData.gender,
+//                 fees: userData.fees,
+//                 about_doctor: userData.about_doctor,
+//               },
+//             ],
+//             { session }
+//           );
+//           roleDoc = roleDoc[0];
+//         } else if (flag === 5) {
+//           // A global therapist is also its own organization.  Use the newly
+//           // created user's numeric ID for both organization identifiers, then
+//           // use those exact values on the therapist record.
+//           const organizationAdmin = await OrganizationAdmin.create(
+//             [
+//               {
+//                 organizationAdminId: user.userId,
+//                 organizationId: user.userId,
+//                 userId: user.userId,
+//                 user: user._id,
+//                 zonalAdminId: parents.admin.zonalAdminId,
+//                 adminId: parents.admin.adminId,
+//                 organization_type: userData.organization_type ?? null,
+//                 city : userData.city,
+//                 state : userData.state,
+//                 pincode : userData.pincode,
+//                 address : userData.address,
+//                 country : userData.country,
+//                 phone : userData.phone,
+//               },
+//             ],
+//             { session }
+//           );
+
+//           roleDoc = await Teacher.create(
+//             [
+//               {
+//                 teacherId: user.userId,
+//                 userId: user.userId,
+//                 user: user._id,
+//                 organizationId: organizationAdmin[0].organizationId,
+//                 organizationAdminId: organizationAdmin[0].organizationAdminId,
+//                 zonalAdminId: organizationAdmin[0].zonalAdminId,
+//                 adminId: organizationAdmin[0].adminId,
+//                 therapist_category: userData.therapist_category,
+//                 yearsOfExperience: userData.yearsOfExperience,
+//                 languages: userData.languages,
+//                 cliniqueName: userData.cliniqueName,
+//                 gender: userData.gender,
+//                 fees: userData.fees,
+//                 about_doctor: userData.about_doctor,
+//               },
+//             ],
+//             { session }
+//           );
+//           roleDoc = roleDoc[0];
+//         } else if (flag === 6) {
+//           roleDoc = await ZonalAdmin.create(
+//             [
+//               {
+//                 zonalAdminId: user.userId,
+//                 userId: user.userId,
+//                 user: user._id,
+//                 superAdminId: userData.superAdminId,
+//                 // superAdminId: parents.superAdmin.adminId,
+//                 city : userData.city,
+//                 state : userData.state,
+//                 pincode : userData.pincode,
+//                 address : userData.address,
+//                 phone : userData.phone,
+//                 country : userData.country,
+//               },
+//             ],
+//             { session }
+//           );
+//           roleDoc = roleDoc[0];
+//         } else if (flag === 7) {
+//           roleDoc = await Admin.create(
+//             [
+//               {
+//                 adminId: user.userId,
+//                 userId: user.userId,
+//                 user: user._id,
+//                 zonalAdminId: parents.zonalAdmin.zonalAdminId,
+//                 city: userData.city,
+//                 state: userData.state,
+//                 pincode: userData.pincode,
+//                 address: userData.address,
+//                 phone: userData.phone,
+//                 country: userData.country,
+//                 status: 1,
+//               },
+//             ],
+//             { session }
+//           );
+//           roleDoc = roleDoc[0];
+//         } else {
+//           const error = new Error("Invalid flag value");
+//           error.statusCode = 400;
+//           throw error;
+//         }
+//       });
+//     } catch (txErr) {
+//       // If transactions are not supported (e.g., standalone Mongo), do a best-effort rollback flow
+//       if (
+//         typeof txErr?.message === "string" &&
+//         (txErr.message.includes("Transaction") ||
+//           txErr.message.includes("replica set") ||
+//           txErr.message.includes("not supported"))
+//       ) {
+//         // Create user first
+//         user = await User.create({
+//           name: userData.name,
+//           email: userData.email,
+//           flag,
+//           password: generatedPassword,
+//           status: 1,
+//           city : userData.city,
+//           state : userData.state,
+//           pincode : userData.pincode,
+//           address : userData.address,
+//           phone : userData.phone,
+//           country : userData.country,
+//         });
+
+//         try {
+//           if (flag === 0) {
+//             roleDoc = await SuperAdmin.create({
+//               adminId: user.userId,
+//               userId: user.userId,
+//               user: user._id,
+//             });
+//           } else if (flag === 1) {
+//             roleDoc = await OrganizationAdmin.create({
+//               organizationAdminId: user.userId,
+//               userId: user.userId,
+//               user: user._id,
+//               organizationId: user.userId,
+//               adminId: parents.admin.adminId,
+//               organization_type: Number(userData.organization_type),
+//               zonalAdminId: parents.admin.zonalAdminId,
+//               city : userData.city,
+//               state : userData.state,
+//               pincode : userData.pincode,
+//               address : userData.address,
+//               phone : userData.phone,
+//               country : userData.country,
+//             });
+//           }else if (flag === 2 || flag === 4) {
+//             roleDoc = await Parent.create({
+//               parentId: user.userId,
+//               userId: user.userId,
+//               user: user._id,
+//               organizationId: flag === 2 ? parents.therapist.organizationId : null,
+//               organizationAdminId:
+//                 flag === 2 ? parents.therapist.organizationAdminId : null,
+//               zonalAdminId:
+//                 flag === 2
+//                   ? parents.therapist.zonalAdminId ??
+//                     parents.organizationAdmin?.zonalAdminId
+//                   : null,
+//               adminId:
+//                 flag === 2
+//                   ? parents.therapist.adminId ?? parents.organizationAdmin?.adminId
+//                   : null,
+//               therapistId: flag === 2 ? parents.therapist.teacherId : null,
+//               teacherId: flag === 2 ? parents.therapist.teacherId : null,
+//             });
+//           } else if (flag === 3) {
+//             roleDoc = await Teacher.create({
+//               teacherId: user.userId,
+//               userId: user.userId,
+//               user: user._id,
+//               organizationId: flag === 3 ? parents.organizationAdmin.organizationId : null,
+//               organizationAdminId: flag === 3 ? parents.organizationAdmin.organizationAdminId : null,
+//               zonalAdminId: flag === 3 ? parents.organizationAdmin.zonalAdminId : null,
+//               adminId: flag === 3 ? parents.organizationAdmin.adminId : null,
+//               therapist_category: userData.therapist_category,
+//               yearsOfExperience: userData.yearsOfExperience,
+//               languages: userData.languages,
+//               cliniqueName: userData.cliniqueName,
+//               gender: userData.gender,
+//               fees: userData.fees,
+//               about_doctor: userData.about_doctor,
+//             });
+//           } else if (flag === 5) {
+//             const organizationAdmin = await OrganizationAdmin.create({
+//               organizationAdminId: user.userId,
+//               organizationId: user.userId,
+//               userId: user.userId,
+//               user: user._id,
+//               zonalAdminId: parents.admin.zonalAdminId,
+//               adminId: parents.admin.adminId,
+//               organization_type: userData.organization_type ?? null,
+//               city: userData.city,
+//               state: userData.state,
+//               pincode: userData.pincode,
+//               address: userData.address,
+//               country: userData.country,
+//               phone: userData.phone,
+//             });
+
+//             roleDoc = await Teacher.create(
+//               {
+//                 teacherId: user.userId,
+//                 userId: user.userId,
+//                 user: user._id,
+//                 organizationId: organizationAdmin.organizationId,
+//                 organizationAdminId: organizationAdmin.organizationAdminId,
+//                 zonalAdminId: organizationAdmin.zonalAdminId,
+//                 adminId: organizationAdmin.adminId,
+//                 therapist_category: userData.therapist_category,
+//                 yearsOfExperience: userData.yearsOfExperience,
+//                 languages: userData.languages,
+//                 cliniqueName: userData.cliniqueName,
+//                 gender: userData.gender,
+//                 fees: userData.fees,
+//                 about_doctor: userData.about_doctor,
+//               }
+//             );
+//         } else if (flag === 6) {
+//             roleDoc = await ZonalAdmin.create({
+//                   zonalAdminId: user.userId,
+//                   userId: user.userId,
+//                   user: user._id,
+//                   superAdminId: parents.superAdmin.adminId,
+//                   city : userData.city,
+//                   state : userData.state,
+//                   pincode : userData.pincode,
+//                   address : userData.address,
+//                   phone : userData.phone,
+//                   country : userData.country,
+//                 });
+//           } else if (flag === 7) {
+//             roleDoc = await Admin.create({
+//               adminId: user.userId,
+//               userId: user.userId,
+//               user: user._id,
+//               zonalAdminId: parents.zonalAdmin.zonalAdminId,
+//               city: userData.city,
+//               state: userData.state,
+//               pincode: userData.pincode,
+//               address: userData.address,
+//               phone: userData.phone,
+//               country: userData.country,
+//               status: 1,
+//             });
+//           } else {
+//             const error = new Error("Invalid flag value");
+//             error.statusCode = 400;
+//             throw error;
+//           }
+//         } catch (roleErr) {
+//             // Remove role documents created before the failure
+//           if (flag === 5) {
+//             await OrganizationAdmin.deleteOne({
+//               userId: user.userId,
+//             });
+
+//             await Teacher.deleteOne({
+//               userId: user.userId,
+//             });
+//           }
+
+//           // Remove User
+//           await User.deleteOne({
+//             _id: user._id,
+//           });
+
+//           throw roleErr;
+//         }
+//       } else {
+//         throw txErr;
+//       }
+//     } finally {
+//       session.endSession();
+//     }
+
+//     await sendEmail(
+//       userData.email,
+//       "Your Account Credentials",
+//       `
+//         <h2>Welcome ${userData.name}</h2>
+//         <p>Your account has been created successfully.</p>
+//         <p><strong>Email:</strong> ${userData.email}</p>
+//         <p><strong>Password:</strong> ${generatedPassword}</p>
+//         <p>Please login and change your password.</p>
+//       `
+//     );
+
+//     await sendNotification({
+//       userId: user.userId,
+//       title: "Registration Successful",
+//       message: `Welcome ${user.name}! Your account has been created successfully.`,
+//       metadata: {
+//         userId: user.userId,
+//         email: user.email,
+//         flag: user.flag,
+//         role: roleDoc?.constructor?.modelName || null,
+//       },
+//     });
+
+//     // Return user without password, plus the generated password separately
+//     const userObject = user.toObject();
+//     delete userObject.password;
+//     return {
+//       user: userObject,
+//       generatedPassword,
+//       role: roleDoc
+//         ? { collection: roleDoc.constructor?.modelName, _id: roleDoc._id }
+//         : null,
+//     };
+//   } catch (error) {
+//     // Handle Mongoose validation errors
+//     if (error.name === "ValidationError") {
+//       error.statusCode = 400;
+//     }
+//     throw error;
+//   }
+// };
+
+// export const loginUser = async (email, password) => {
+//   // Find user and include password
+//   const user = await User.findOne({ email }).select("+password");
+
+//   if (!user) {
+//     const error = new Error("Invalid email or password");
+//     error.statusCode = 401;
+//     throw error;
+//   }
+
+//   //  CHECK STATUS FIRST
+//   if (user.status !== 1) {
+//     const error = new Error("Your account is inactive. Please contact admin.");
+//     error.statusCode = 403;
+//     throw error;
+//   }
+
+//   // Compare password
+//   const isPasswordValid = await user.comparePassword(password);
+
+//   if (!isPasswordValid) {
+//     const error = new Error("Invalid email or password");
+//     error.statusCode = 401;
+//     throw error;
+//   }
+
+//   const token = generateAccessToken(user._id.toString());
+//   const refreshToken = await createRefreshTokenRecord(user._id.toString(), user._id);
+
+//   // Remove password
+//   const userObject = user.toObject();
+//   delete userObject.password;
+
+//   return { user: userObject, token, accessToken: token, refreshToken };
+// };
+
 
 export const registerUser = async (userData) => {
-
-  // return userData;
   // Check if user already exists
   const existingUser = await User.findOne({ email: userData.email });
   if (existingUser) {
@@ -233,8 +807,7 @@ export const registerUser = async (userData) => {
   let exists;
 
   do {
-    // referralCode = generateReferralCode(6);
-      referralCode = generateReferralCode(userData.name, 6);
+    referralCode = generateReferralCode(userData.name, 6);
 
     exists = await User.findOne({
       referralCode,
@@ -311,7 +884,6 @@ export const registerUser = async (userData) => {
       }
     }
 
-
     if (flag === 1) {
       requireField(userData.organization_type, "organization_type", "Organization Admin");
       if (![0, 1].includes(Number(userData.organization_type))) {
@@ -322,6 +894,32 @@ export const registerUser = async (userData) => {
     }
 
     const parents = await getRoleParents(flag, userData);
+
+    const toStringArray = (val) =>
+      Array.isArray(val)
+        ? val.map((v) => String(v).trim()).filter(Boolean)
+        : typeof val === "string" && val.trim()
+        ? val.split(",").map((v) => v.trim()).filter(Boolean)
+        : [];
+
+    const teacherFields = {
+      therapist_category: userData.therapist_category,
+      phone: userData.phone ?? null,
+      specialization: toStringArray(userData.specialization ?? userData.therapist_category),
+      qualifications: toStringArray(userData.qualifications ?? userData.qualification),
+      yearsOfExperience:
+        userData.yearsOfExperience !== undefined && userData.yearsOfExperience !== ""
+          ? Number(userData.yearsOfExperience)
+          : 0,
+      languages: toStringArray(userData.languages),
+      cliniqueName: userData.cliniqueName || null,
+      gender: userData.gender || null,
+      fees:
+        userData.fees !== undefined && userData.fees !== ""
+          ? Number(userData.fees)
+          : 0,
+      about_doctor: userData.about_doctor ?? userData.about ?? null,
+    };
 
     // Use transaction when available; fallback to manual rollback if transactions are not supported
     const session = await mongoose.startSession();
@@ -339,12 +937,12 @@ export const registerUser = async (userData) => {
               password: generatedPassword,
               referralCode,
               status: 1,
-              city : userData.city,
-              state : userData.state,
-              pincode : userData.pincode,
-              address : userData.address,
-              phone : userData.phone,
-              country : userData.country,
+              city: userData.city,
+              state: userData.state,
+              pincode: userData.pincode,
+              address: userData.address,
+              phone: userData.phone,
+              country: userData.country,
               profileImg: userData.profileImg,
               org_name: userData.org_name,
             },
@@ -352,13 +950,7 @@ export const registerUser = async (userData) => {
           { session }
         );
         user = user[0];
-        // user = await User.findById(user._id);
         user = await User.findById(user._id).session(session);
-        // await user.save({ session });
-        // console.log("Created user:", {
-        //   _id: user._id,
-        //   userId: user.userId,
-        // });
 
         // Create role-specific "table"
         if (flag === 0) {
@@ -380,17 +972,16 @@ export const registerUser = async (userData) => {
                 organizationAdminId: user.userId,
                 userId: user.userId,
                 user: user._id,
-                // for OrganizationAdmin, organizationId is this same user's userId
                 organizationId: user.userId,
                 adminId: parents.admin.adminId,
                 organization_type: Number(userData.organization_type),
                 zonalAdminId: parents.admin.zonalAdminId,
-                city : userData.city,
-                state : userData.state,
-                pincode : userData.pincode,
-                address : userData.address,
-                country : userData.country,
-                phone : userData.phone,
+                city: userData.city,
+                state: userData.state,
+                pincode: userData.pincode,
+                address: userData.address,
+                country: userData.country,
+                phone: userData.phone,
               },
             ],
             { session }
@@ -433,20 +1024,14 @@ export const registerUser = async (userData) => {
                 organizationAdminId: parents.organizationAdmin.organizationAdminId,
                 zonalAdminId: parents.organizationAdmin.zonalAdminId,
                 adminId: parents.organizationAdmin.adminId,
-                therapist_category: userData.therapist_category,
-                yearsOfExperience: userData.yearsOfExperience,
-                languages: userData.languages,
-                cliniqueName: userData.cliniqueName,
-                gender: userData.gender,
-                fees: userData.fees,
-                about_doctor: userData.about_doctor,
+                ...teacherFields,
               },
             ],
             { session }
           );
           roleDoc = roleDoc[0];
         } else if (flag === 5) {
-          // A global therapist is also its own organization.  Use the newly
+          // A global therapist is also its own organization. Use the newly
           // created user's numeric ID for both organization identifiers, then
           // use those exact values on the therapist record.
           const organizationAdmin = await OrganizationAdmin.create(
@@ -459,12 +1044,12 @@ export const registerUser = async (userData) => {
                 zonalAdminId: parents.admin.zonalAdminId,
                 adminId: parents.admin.adminId,
                 organization_type: userData.organization_type ?? null,
-                city : userData.city,
-                state : userData.state,
-                pincode : userData.pincode,
-                address : userData.address,
-                country : userData.country,
-                phone : userData.phone,
+                city: userData.city,
+                state: userData.state,
+                pincode: userData.pincode,
+                address: userData.address,
+                country: userData.country,
+                phone: userData.phone,
               },
             ],
             { session }
@@ -480,13 +1065,7 @@ export const registerUser = async (userData) => {
                 organizationAdminId: organizationAdmin[0].organizationAdminId,
                 zonalAdminId: organizationAdmin[0].zonalAdminId,
                 adminId: organizationAdmin[0].adminId,
-                therapist_category: userData.therapist_category,
-                yearsOfExperience: userData.yearsOfExperience,
-                languages: userData.languages,
-                cliniqueName: userData.cliniqueName,
-                gender: userData.gender,
-                fees: userData.fees,
-                about_doctor: userData.about_doctor,
+                ...teacherFields,
               },
             ],
             { session }
@@ -500,13 +1079,12 @@ export const registerUser = async (userData) => {
                 userId: user.userId,
                 user: user._id,
                 superAdminId: userData.superAdminId,
-                // superAdminId: parents.superAdmin.adminId,
-                city : userData.city,
-                state : userData.state,
-                pincode : userData.pincode,
-                address : userData.address,
-                phone : userData.phone,
-                country : userData.country,
+                city: userData.city,
+                state: userData.state,
+                pincode: userData.pincode,
+                address: userData.address,
+                phone: userData.phone,
+                country: userData.country,
               },
             ],
             { session }
@@ -552,13 +1130,16 @@ export const registerUser = async (userData) => {
           email: userData.email,
           flag,
           password: generatedPassword,
+          referralCode,
           status: 1,
-          city : userData.city,
-          state : userData.state,
-          pincode : userData.pincode,
-          address : userData.address,
-          phone : userData.phone,
-          country : userData.country,
+          city: userData.city,
+          state: userData.state,
+          pincode: userData.pincode,
+          address: userData.address,
+          phone: userData.phone,
+          country: userData.country,
+          profileImg: userData.profileImg,
+          org_name: userData.org_name,
         });
 
         try {
@@ -577,14 +1158,14 @@ export const registerUser = async (userData) => {
               adminId: parents.admin.adminId,
               organization_type: Number(userData.organization_type),
               zonalAdminId: parents.admin.zonalAdminId,
-              city : userData.city,
-              state : userData.state,
-              pincode : userData.pincode,
-              address : userData.address,
-              phone : userData.phone,
-              country : userData.country,
+              city: userData.city,
+              state: userData.state,
+              pincode: userData.pincode,
+              address: userData.address,
+              phone: userData.phone,
+              country: userData.country,
             });
-          }else if (flag === 2 || flag === 4) {
+          } else if (flag === 2 || flag === 4) {
             roleDoc = await Parent.create({
               parentId: user.userId,
               userId: user.userId,
@@ -613,13 +1194,7 @@ export const registerUser = async (userData) => {
               organizationAdminId: flag === 3 ? parents.organizationAdmin.organizationAdminId : null,
               zonalAdminId: flag === 3 ? parents.organizationAdmin.zonalAdminId : null,
               adminId: flag === 3 ? parents.organizationAdmin.adminId : null,
-              therapist_category: userData.therapist_category,
-              yearsOfExperience: userData.yearsOfExperience,
-              languages: userData.languages,
-              cliniqueName: userData.cliniqueName,
-              gender: userData.gender,
-              fees: userData.fees,
-              about_doctor: userData.about_doctor,
+              ...teacherFields,
             });
           } else if (flag === 5) {
             const organizationAdmin = await OrganizationAdmin.create({
@@ -638,37 +1213,29 @@ export const registerUser = async (userData) => {
               phone: userData.phone,
             });
 
-            roleDoc = await Teacher.create(
-              {
-                teacherId: user.userId,
-                userId: user.userId,
-                user: user._id,
-                organizationId: organizationAdmin.organizationId,
-                organizationAdminId: organizationAdmin.organizationAdminId,
-                zonalAdminId: organizationAdmin.zonalAdminId,
-                adminId: organizationAdmin.adminId,
-                therapist_category: userData.therapist_category,
-                yearsOfExperience: userData.yearsOfExperience,
-                languages: userData.languages,
-                cliniqueName: userData.cliniqueName,
-                gender: userData.gender,
-                fees: userData.fees,
-                about_doctor: userData.about_doctor,
-              }
-            );
-        } else if (flag === 6) {
+            roleDoc = await Teacher.create({
+              teacherId: user.userId,
+              userId: user.userId,
+              user: user._id,
+              organizationId: organizationAdmin.organizationId,
+              organizationAdminId: organizationAdmin.organizationAdminId,
+              zonalAdminId: organizationAdmin.zonalAdminId,
+              adminId: organizationAdmin.adminId,
+              ...teacherFields,
+            });
+          } else if (flag === 6) {
             roleDoc = await ZonalAdmin.create({
-                  zonalAdminId: user.userId,
-                  userId: user.userId,
-                  user: user._id,
-                  superAdminId: parents.superAdmin.adminId,
-                  city : userData.city,
-                  state : userData.state,
-                  pincode : userData.pincode,
-                  address : userData.address,
-                  phone : userData.phone,
-                  country : userData.country,
-                });
+              zonalAdminId: user.userId,
+              userId: user.userId,
+              user: user._id,
+              superAdminId: parents.superAdmin.adminId,
+              city: userData.city,
+              state: userData.state,
+              pincode: userData.pincode,
+              address: userData.address,
+              phone: userData.phone,
+              country: userData.country,
+            });
           } else if (flag === 7) {
             roleDoc = await Admin.create({
               adminId: user.userId,
@@ -689,21 +1256,25 @@ export const registerUser = async (userData) => {
             throw error;
           }
         } catch (roleErr) {
-            // Remove role documents created before the failure
-          if (flag === 5) {
-            await OrganizationAdmin.deleteOne({
-              userId: user.userId,
-            });
+          try {
+            if (flag === 5) {
+              await OrganizationAdmin.deleteOne({
+                userId: user.userId,
+              });
+            }
 
-            await Teacher.deleteOne({
-              userId: user.userId,
+            if (flag === 3 || flag === 5) {
+              await Teacher.deleteOne({
+                userId: user.userId,
+              });
+            }
+
+            await User.deleteOne({
+              _id: user._id,
             });
+          } catch (cleanupErr) {
+            console.error("Rollback cleanup error:", cleanupErr);
           }
-
-          // Remove User
-          await User.deleteOne({
-            _id: user._id,
-          });
 
           throw roleErr;
         }
@@ -756,44 +1327,7 @@ export const registerUser = async (userData) => {
     throw error;
   }
 };
-
-// export const loginUser = async (email, password) => {
-//   // Find user and include password
-//   const user = await User.findOne({ email }).select("+password");
-
-//   if (!user) {
-//     const error = new Error("Invalid email or password");
-//     error.statusCode = 401;
-//     throw error;
-//   }
-
-//   //  CHECK STATUS FIRST
-//   if (user.status !== 1) {
-//     const error = new Error("Your account is inactive. Please contact admin.");
-//     error.statusCode = 403;
-//     throw error;
-//   }
-
-//   // Compare password
-//   const isPasswordValid = await user.comparePassword(password);
-
-//   if (!isPasswordValid) {
-//     const error = new Error("Invalid email or password");
-//     error.statusCode = 401;
-//     throw error;
-//   }
-
-//   const token = generateAccessToken(user._id.toString());
-//   const refreshToken = await createRefreshTokenRecord(user._id.toString(), user._id);
-
-//   // Remove password
-//   const userObject = user.toObject();
-//   delete userObject.password;
-
-//   return { user: userObject, token, accessToken: token, refreshToken };
-// };
-
-
+//////////////////
 export const loginUser = async (email, password) => {
   if (!email || !password) {
     const error = new Error("Email and password are required");

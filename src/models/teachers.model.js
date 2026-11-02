@@ -21,9 +21,8 @@ const teacherSchema = new mongoose.Schema(
       required: true,
       index: true,
     },
-    // This is the organization's users.userId (Number), not Mongo _id.
-    // A flag-5 therapist is its own organization, so these fields contain
-    // that therapist's userId as well.
+    // Only for TeachersOrg (flag 3). For TeachersGlobal (flag 5) keep null.
+    // This is the organization's users.userId (Number), not Mongo _id
     organizationId: {
       type: Number,
       default: null,
@@ -44,7 +43,8 @@ const teacherSchema = new mongoose.Schema(
       default: null,
       index: true,
     },
-    therapist_category: {
+
+        therapist_category: {
       type: String,
       index: true,
       enum: [
@@ -97,6 +97,7 @@ const teacherSchema = new mongoose.Schema(
       default: null,
       trim: true,
     },
+    
     languages: {
       type: [String],
       default: [],
@@ -113,3 +114,4 @@ const teacherSchema = new mongoose.Schema(
 );
 
 export default mongoose.model("Teacher", teacherSchema);
+
