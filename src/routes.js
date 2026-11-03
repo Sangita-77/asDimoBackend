@@ -89,6 +89,10 @@ appointmentsRouter.patch("/cancel/:id", authenticate, protect, appointmentsContr
 appointmentsRouter.patch("/complete/:id", authenticate, protect, appointmentsController.completeAppointment);
 appointmentsRouter.get("/available-slots/:doctorId", authenticate, protect, appointmentsController.getAvailableSlots);
 appointmentsRouter.post("/getAppointmentsForParent",authenticate,protect,appointmentsController.getAppointmentsForParent);
+appointmentsRouter.patch("/updatePaymentStatus/:id", authenticate, protect, appointmentsController.updatePaymentStatus);
+appointmentsRouter.put("/updatePaymentStatus/:id", authenticate, protect, appointmentsController.updatePaymentStatus);
+appointmentsRouter.post("/updatePaymentStatus", authenticate, protect, appointmentsController.updatePaymentStatus);
+appointmentsRouter.patch("/payment-status/:id", authenticate, protect, appointmentsController.updatePaymentStatus);
 router.use("/appointments", appointmentsRouter);
 
 
