@@ -23,6 +23,10 @@ import {
   updateQuestionAnswerService,
   updateUserRelationService,
   authenticateWithGoogle,
+  getUsersByFlag2And4Service,
+  getTeachersAvailabilityByCityAndCategoryService,
+  getDistinctCitiesService,
+  getDistinctTherapistCategoriesService,
 } from "../services/auth.service.js";
 import {
   sendEmailOtp,
@@ -1083,5 +1087,74 @@ export const googleAuth = asyncHandler(async (req, res) => {
       ? "Google registration and login successful"
       : "Google login successful",
     data: result,
+  });
+});
+
+
+export const getUsersByFlag2And4 = asyncHandler(async (req, res) => {
+  const { search, sort, sortBy, sortOrder } = {
+    ...(req.query || {}),
+    ...(req.body || {}),
+  };
+
+  const users = await getUsersByFlag2And4Service({
+    search,
+    sort,
+    sortBy,
+    sortOrder,
+  });
+
+  res.status(200).json({
+    success: true,
+    count: users.length,
+    data: users,
+  });
+});
+
+export const getTeachersAvailabilityByCityAndCategory = asyncHandler(
+  async (req, res) => {
+    const { city, therapist_category } = {
+      ...(req.query || {}),
+      ...(req.body || {}),
+    };
+
+    if (!city || !therapist_category) {
+      return res.status(400).json({
+        success: false,
+        message: "city and therapist_category are required",
+      });
+    }
+
+    const data = await getTeachersAvailabilityByCityAndCategoryService({
+      city,
+      therapist_category,
+    });
+
+    res.status(200).json({
+      success: true,
+      count: data.length,
+      data,
+    });
+  }
+);
+
+
+export const getDistinctCities = asyncHandler(async (req, res) => {
+  const cities = await getDistinctCitiesService();
+
+  res.status(200).json({
+    success: true,
+    count: cities.length,
+    data: cities,
+  });
+});
+
+export const getDistinctTherapistCategories = asyncHandler(async (req, res) => {
+  const categories = await getDistinctTherapistCategoriesService();
+
+  res.status(200).json({
+    success: true,
+    count: categories.length,
+    data: categories,
   });
 });

@@ -61,6 +61,14 @@ authRouter.post("/getAllUsersById", authenticate, protect, authController.getAll
 authRouter.post("/personalize", authenticate, protect, authController.saveQuestionAnswer);
 authRouter.post("/get-personalize", authenticate, protect, authController.getQuestionAnswer);
 authRouter.put("/updateUserRelation1",authenticate,protect,authController.updateUserRelation);
+authRouter.get("/getUsersByForParent", authenticate, protect, authController.getUsersByFlag2And4);
+authRouter.post("/getUsersByFlag2And4", authenticate, protect, authController.getUsersByFlag2And4);
+authRouter.post("/getTeachersAvailabilityByCityAndCategory", authenticate, protect, authController.getTeachersAvailabilityByCityAndCategory);
+authRouter.get("/getTeachersAvailabilityByCityAndCategory", authenticate, protect, authController.getTeachersAvailabilityByCityAndCategory);
+authRouter.get("/cities", authenticate, protect, authController.getDistinctCities);
+authRouter.post("/cities", authenticate, protect, authController.getDistinctCities);
+authRouter.get("/therapist-categories", authenticate, protect, authController.getDistinctTherapistCategories);
+authRouter.post("/therapist-categories", authenticate, protect, authController.getDistinctTherapistCategories);
 router.use("/auth", authRouter);
 
 const therapistsRouter = Router();

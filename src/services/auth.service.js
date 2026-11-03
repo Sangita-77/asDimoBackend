@@ -10,6 +10,7 @@ import Admin from "../models/admin.model.js";
 import RefreshToken from "../models/refreshToken.model.js";
 import Personalize from "../models/personalize.model.js";
 import Appointment from "../models/appoinment.model.js";
+import Availability from "../models/avialability.model.js";
 import mongoose from "mongoose";
 import { OAuth2Client } from "google-auth-library";
 import axios from "axios";
@@ -5228,3 +5229,201 @@ export const authenticateWithGoogle = async (
 };
 
 const googleOAuthClient = new OAuth2Client();
+
+export const getUsersByFlag2And4Service = async (options = {}) => {
+  const users = await User.find({ flag: { $in: [2, 4] } , status: 1 })
+    .select("-password")
+    .lean();
+
+  if (!users || users.length === 0) {
+    return [];
+  }
+
+  const enrichedUsers = await Promise.all(
+    users.map(async (user) => {
+      const roleData = await Parent.findOne({ userId: user.userId }).lean();
+      const relatedData = await getRelatedRoleData(user, roleData);
+
+      if (relatedData?.Admin && !relatedData.Admin.userData) {
+        relatedData.Admin = await enrichSingleWithUserData(relatedData.Admin);
+      }
+
+      if (relatedData?.admin && !relatedData.admin.userData) {
+        relatedData.admin = await enrichSingleWithUserData(relatedData.admin);
+      }
+
+      if (
+        relatedData?.organizations &&
+        !relatedData.organizations.data &&
+        !relatedData.organizations.userData
+      ) {
+        relatedData.organizations = await enrichSingleWithUserData(
+          relatedData.organizations
+        );
+      }
+
+      if (relatedData?.organization && !relatedData.organization.userData) {
+        relatedData.organization = await enrichSingleWithUserData(
+          relatedData.organization
+        );
+      }
+
+      if (relatedData?.teacher && !relatedData.teacher.userData) {
+        relatedData.teacher = await enrichSingleWithUserData(
+          relatedData.teacher
+        );
+      }
+
+      if (relatedData?.parents?.data) {
+        relatedData.parents.data = await enrichWithUserData(
+          relatedData.parents.data
+        );
+      }
+
+      return {
+        ...user,
+        roleData,
+        relatedData,
+      };
+    })
+  );
+
+  const hasUserSelectedSort =
+    options?.sortBy &&
+    options.sortBy !== "name" &&
+    options?.sortOrder;
+
+  if (!hasUserSelectedSort) {
+    return applySearchAndSort(enrichedUsers, {
+      ...options,
+      sortBy: "createdAt",
+      sortOrder: "desc",
+    });
+  }
+
+  return applySearchAndSort(enrichedUsers, options);
+};
+
+const escapeRegex = (value) =>
+  String(value).replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+
+export const getTeachersAvailabilityByCityAndCategoryService = async ({
+  city,
+  therapist_category,
+}) => {
+  const trimmedCity = String(city ?? "").trim();
+  const trimmedCategory = String(therapist_category ?? "").trim();
+
+  if (!trimmedCity || !trimmedCategory) {
+    const error = new Error("city and therapist_category are required");
+    error.statusCode = 400;
+    throw error;
+  }
+
+  const cityRegex = new RegExp(`^${escapeRegex(trimmedCity)}$`, "i");
+  const categoryRegex = new RegExp(`^${escapeRegex(trimmedCategory)}$`, "i");
+
+  // 1. Get users from User table against city
+  const users = await User.find({
+    city: cityRegex,
+  })
+    .select("-password")
+    .lean();
+
+  if (!users.length) {
+    return [];
+  }
+
+  const userIdsFromCity = users
+    .map((u) => u.userId)
+    .filter((id) => id !== undefined && id !== null);
+
+  // 2. Get teachers from Teacher table against therapist_category and matched userIds
+  const teachers = await Teacher.find({
+    userId: { $in: userIdsFromCity },
+    therapist_category: categoryRegex,
+  }).lean();
+
+  if (!teachers.length) {
+    return [];
+  }
+
+  // 3. Get the teachers' userId and fetch data from availabilities table against userId
+  const teacherUserIds = teachers
+    .map((t) => t.userId)
+    .filter((id) => id !== undefined && id !== null);
+
+  const availabilities = await Availability.find({
+    userId: { $in: teacherUserIds },
+  }).lean();
+
+  const userMap = new Map(users.map((u) => [u.userId, u]));
+  const availabilityMap = new Map();
+
+  for (const slot of availabilities) {
+    if (!availabilityMap.has(slot.userId)) {
+      availabilityMap.set(slot.userId, []);
+    }
+    availabilityMap.get(slot.userId).push(slot);
+  }
+
+  return teachers.map((teacher) => {
+    const userData = userMap.get(teacher.userId) || null;
+    const teacherAvailabilities = availabilityMap.get(teacher.userId) || [];
+
+    return {
+      ...(userData || {}),
+      userId: teacher.userId,
+      userData,
+      teacherData: teacher,
+      availabilities: teacherAvailabilities,
+    };
+  });
+};
+
+
+export const getDistinctCitiesService = async () => {
+  const rawCities = await User.distinct("city", {
+    city: { $nin: [null, ""] },
+  });
+
+  const seen = new Set();
+  const uniqueCities = [];
+
+  for (const city of rawCities) {
+    if (typeof city !== "string") continue;
+    const trimmed = city.trim();
+    if (!trimmed) continue;
+
+    const normalized = trimmed.toLowerCase();
+    if (!seen.has(normalized)) {
+      seen.add(normalized);
+      uniqueCities.push(trimmed);
+    }
+  }
+
+  return uniqueCities;
+};
+
+export const getDistinctTherapistCategoriesService = async () => {
+  const rawCategories = await Teacher.distinct("therapist_category", {
+    therapist_category: { $nin: [null, ""] },
+  });
+
+  const seen = new Set();
+  const uniqueCategories = [];
+
+  for (const category of rawCategories) {
+    if (typeof category !== "string") continue;
+    const trimmed = category.trim();
+    if (!trimmed) continue;
+
+    const normalized = trimmed.toLowerCase();
+    if (!seen.has(normalized)) {
+      seen.add(normalized);
+      uniqueCategories.push(trimmed);
+    }
+  }
+
+  return uniqueCategories;
+};
