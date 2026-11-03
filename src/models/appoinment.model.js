@@ -48,6 +48,16 @@ const appoinmentSchema = new mongoose.Schema(
         type: String,
         required: false,
       },
+
+      amount: {
+        type: Number,
+        required: false,
+      },
+
+      paymentStatus: {
+        type: String,
+        required: false,
+      },
   
       zoomLink: String,
       doneBy: {

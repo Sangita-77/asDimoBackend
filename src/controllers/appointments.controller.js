@@ -2,7 +2,7 @@ import { asyncHandler } from "../utils/asyncHandler.js";
 import * as appointmentsService from "../services/appointments.service.js";
 
 export const createAppointment = asyncHandler(async (req, res) => {
-    const {teacherId , date , time , parentId , paymentId } = req.body;
+    const {teacherId , date , time , parentId , paymentId ,doneBy } = req.body;
 
   if (!teacherId || !date || !time || !parentId || !paymentId) {
     return res.status(400).json({

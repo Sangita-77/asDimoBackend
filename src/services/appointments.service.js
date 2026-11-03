@@ -32,8 +32,18 @@ export const createAppointment = async (data) => {
     time: data.time,
     status: data.status || "approved",
     // status: data.status || "pending",
-    paymentId: data.paymentId,
+    paymentId: data.paymentId ?? null,
+    ...(data.amount !== undefined && data.amount !== null && data.amount !== ""
+      ? { amount: Number(data.amount) }
+      : {}),
+    paymentStatus:
+      data.paymentId === null ||
+      data.paymentId === undefined ||
+      String(data.paymentId).trim() === ""
+        ? "pending"
+        : data.paymentStatus || "completed",
     zoomLink: availability.zoomLink,
+    doneBy: data.doneBy || "parent",
   });
 
     const AvailabilityUp = await Availability.findByIdAndUpdate(availability._id, {
