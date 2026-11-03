@@ -184,3 +184,31 @@ export const getAppointmentsById = asyncHandler(async (req, res) => {
     data: appointments,
   });
 });
+
+
+
+
+
+export const updatePaymentStatus = asyncHandler(async (req, res) => {
+  const id = req.params.id || req.body.id || req.body.appointmentId;
+  const { paymentStatus, status, paymentId } = req.body;
+
+  if (!id) {
+    return res.status(400).json({
+      success: false,
+      message: "Appointment id is required",
+    });
+  }
+
+  const appointment = await appointmentsService.updatePaymentStatus(id, {
+    paymentStatus,
+    status,
+    paymentId,
+  });
+
+  res.status(200).json({
+    success: true,
+    message: "Payment status updated successfully",
+    data: appointment,
+  });
+});
