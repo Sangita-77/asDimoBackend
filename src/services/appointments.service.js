@@ -24,13 +24,27 @@ export const createAppointment = async (data) => {
     throw error;
   }
 
+  const paymentStatus =
+    data.paymentId === null ||
+    data.paymentId === undefined ||
+    String(data.paymentId).trim() === ""
+      ? "pending"
+      : data.paymentStatus || "completed";
+
+  const status =
+    paymentStatus === "pending"
+      ? "pending"
+      : paymentStatus === "completed"
+        ? "approved"
+        : data.status || "pending";
+
   const appointment = await Appointment.create({
     parentId: data.parentId,
     teacherId: data.teacherId || data.doctorId,
     availabilityId: availability._id,
     date: data.date,
     time: data.time,
-    status: data.status || "approved",
+    status,
     // status: data.status || "pending",
     paymentId: data.paymentId ?? null,
     ...(data.amount !== undefined && data.amount !== null && data.amount !== ""
@@ -1689,4 +1703,35 @@ export const getAppointmentById = async (id) => {
     zonalAdmin,
     admin,
   };
+};
+
+
+
+export const updatePaymentStatus = async (id, data = {}) => {
+  const appointment = await Appointment.findById(id);
+
+  if (!appointment) {
+    const error = new Error("Appointment not found");
+    error.statusCode = 404;
+    throw error;
+  }
+
+  if (data.paymentId !== undefined) {
+    appointment.paymentId = data.paymentId;
+  }
+
+  if (data.paymentStatus !== undefined) {
+    appointment.paymentStatus = data.paymentStatus;
+  }
+
+  if (data.status !== undefined) {
+    appointment.status = data.status;
+  } else if (data.paymentStatus === "completed") {
+    appointment.status = "approved";
+  } else if (data.paymentStatus === "pending") {
+    appointment.status = "pending";
+  }
+
+  await appointment.save();
+  return appointment;
 };
